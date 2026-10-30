@@ -31,12 +31,25 @@ export function tintSprite(s, rgb) {
   return s;
 }
 
+// Escala atual da tela (dpr × zoom). Com ela os sprites caem alinhados ao pixel do
+// dispositivo e o navegador usa a cópia 1:1 (rápida), sem reamostrar a cada quadro.
+let RS = 1;
+export function setDeviceScale(rs) {
+  RS = rs;
+}
+const snap = (v) => Math.round(v * RS) / RS;
+
 export function drawSprite(ctx, s, vx, vy) {
-  ctx.drawImage(s.canvas, vx - s.ox, vy - s.oy, s.w, s.h);
+  ctx.drawImage(s.canvas, snap(vx - s.ox), snap(vy - s.oy), s.w, s.h);
 }
 
-// Desenha com balanço de vento: inclina em torno da base do sprite.
+// Vento: copas balançam deslocando o topo (cópia rápida). Só a moita sacudida usa
+// inclinação de verdade, que é mais cara.
 export function drawSwaying(ctx, s, vx, vy, skew) {
+  if (Math.abs(skew) < 0.04) {
+    drawSprite(ctx, s, vx - skew * s.oy * 0.5, vy);
+    return;
+  }
   ctx.save();
   ctx.translate(vx, vy);
   ctx.transform(1, 0, skew, 1, 0, 0);

@@ -1,7 +1,11 @@
 import { Input } from './engine/input.js';
 import { clamp } from './engine/math.js';
 import { toView, groundFromView, sortKey } from './engine/projection.js';
-import { World } from './world/clearing.js';
+import { World } from './world/world.js';
+import { DebugPanel, loadParams } from './systems/debug.js';
+import { setDeviceScale } from './art/sprite.js';
+import { T } from './world/gen.js';
+import { CHUNK } from './world/terrain.js';
 import { Player } from './entities/player.js';
 import { Capybara } from './entities/capybara.js';
 import { paintPlayer } from './art/player-art.js';
@@ -16,10 +20,25 @@ const ctx = canvas.getContext('2d');
 const input = new Input(canvas);
 const params = new URLSearchParams(location.search);
 
-const world = new World(2026);
-const player = new Player(...world.spawn);
-const capy = new Capybara(world.spawn[0] + 160, world.spawn[1] + 320);
+const world = new World(loadParams());
+const spawn = world.findSpawn(0, 0);
+const player = new Player(...spawn);
+const capy = new Capybara(...world.findSpawn(spawn[0] + 200, spawn[1] + 200));
 const lighting = new Lighting(world);
+const dbgFlags = { grid: false, fly: false, light: true, tiles: false };
+const debug = new DebugPanel({
+  params: world.params,
+  toggles: dbgFlags,
+  onChange: (p) => {
+    world.setParams(p);
+    world.setScale(rs);
+    // se o novo mundo enterrou o jogador, procura chão firme por perto
+    if (!world.isFree(player.x, player.y, 14)) [player.x, player.y] = world.findSpawn(player.x, player.y);
+    if (!world.isFree(capy.x, capy.y, 22)) [capy.x, capy.y] = world.findSpawn(player.x + 120, player.y + 120);
+    capy.home = [capy.x, capy.y];
+  },
+});
+let drawn = 0;
 const popups = new Popups();
 const camTarget = () => { const v = toView(player.x, player.y, 40); return v; };
 const cam = { x: camTarget()[0], y: camTarget()[1] };
@@ -35,13 +54,15 @@ function resize() {
   sh = window.innerHeight;
   canvas.width = Math.round(sw * dpr);
   canvas.height = Math.round(sh * dpr);
-  zoom = clamp(Math.sqrt(sw * sh) / 720, 0.85, 2);
-  const nrs = Math.round(dpr * zoom * 4) / 4; // degraus de 0.25 evitam repintar à toa
+  // escala de renderização em degraus de 0.25, e o zoom se ajusta a ela: sprites e chunks
+  // são copiados 1:1 na tela (sem reamostrar a cada quadro) e não repintam à toa
+  const nrs = Math.max(0.75, Math.round(dpr * clamp(Math.sqrt(sw * sh) / 720, 0.85, 2) * 4) / 4);
+  zoom = nrs / dpr;
   if (nrs !== rs) {
     rs = nrs;
-    world.buildCaches(rs);
-    world.warmChunks();
+    world.setScale(rs);
   }
+  setDeviceScale(rs);
 }
 let resizeTimer;
 window.addEventListener('resize', () => {
@@ -84,9 +105,7 @@ function interact() {
   }
   const bush = world.nearestFruitBush(player.x, player.y, 80);
   if (bush) {
-    bush.hasFruit = false;
-    bush.regrow = 25;
-    bush.shake = 0.6;
+    world.pick(bush);
     player.fruits++;
     popups.add(...headPos(player, 95), '+1 camu-camu', { color: '#f29a4b' });
   }
@@ -95,6 +114,9 @@ function interact() {
 function update(dt) {
   const aim = viewToWorld(input.mouse.x, input.mouse.y);
   world.update(dt);
+  player.noclip = dbgFlags.fly;
+  player.speedMul = dbgFlags.fly ? 4 : 1;
+  lighting.on.shafts = lighting.on.dust = dbgFlags.light;
   player.update(dt, input, world, aim, onStrike);
   capy.update(dt, world, player);
   if (input.hit('KeyE')) interact();
@@ -113,9 +135,10 @@ function update(dt) {
 
   // câmera segue o jogador com suavização
   const [tx, ty] = camTarget();
-  const k = 1 - Math.exp(-dt * 6);
+  const k = 1 - Math.exp(-dt * (dbgFlags.fly ? 12 : 6));
   cam.x += (tx - cam.x) * k;
   cam.y += (ty - cam.y) * k;
+  debug.update(dt, { fps, drawn }, world, player);
 }
 
 function render() {
@@ -128,14 +151,20 @@ function render() {
   };
   ctx.fillStyle = BG;
   ctx.fillRect(view.x0 - 2, view.y0 - 2, view.x1 - view.x0 + 4, view.y1 - view.y0 + 4);
+  // streaming: só existe o que está perto da câmera
+  world.stream(view, 6);
   world.drawGround(ctx, view);
+  if (dbgFlags.tiles) drawTileGrid(view);
 
   const list = world.drawables(view, player);
+  drawn = list.length;
   list.push({ key: sortKey(player.x, player.y), draw: (g) => paintPlayer(g, player.pose, player.trail) });
   list.push({ key: sortKey(capy.x, capy.y), draw: (g) => paintCapybara(g, capy.pose) });
   list.sort((a, b) => a.key - b.key);
   for (const d of list) d.draw(ctx);
-  lighting.apply(ctx, view, world.time);
+  const rect = world.viewToGroundRect(view, 400);
+  lighting.apply(ctx, view, world.time, rect);
+  if (dbgFlags.grid) drawChunkGrid(view);
 
   // corações de confiança sobre a capivara quando o jogador está perto
   const dCapy = Math.hypot(capy.x - player.x, capy.y - player.y);
@@ -148,6 +177,43 @@ function render() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawVignette(ctx, sw, sh);
   drawHud(ctx, sw, sh, { player, capy, hint, fps, showFps });
+}
+
+// ---------- sobreposições do debugger ----------
+function drawChunkGrid(view) {
+  ctx.save();
+  ctx.lineWidth = 2 / zoom;
+  ctx.font = `${12 / zoom}px ui-monospace, monospace`;
+  for (let iy = Math.floor(view.y0 / CHUNK); iy <= Math.floor(view.y1 / CHUNK); iy++)
+    for (let ix = Math.floor(view.x0 / CHUNK); ix <= Math.floor(view.x1 / CHUNK); ix++) {
+      const c = world.chunks.get(ix + ',' + iy);
+      const fresh = c && world.frame - c.born < 30;
+      ctx.strokeStyle = fresh ? 'rgba(242,196,107,0.95)' : 'rgba(244,234,210,0.55)';
+      ctx.strokeRect(ix * CHUNK, iy * CHUNK, CHUNK, CHUNK);
+      ctx.fillStyle = 'rgba(244,234,210,0.85)';
+      ctx.fillText(`chunk ${ix},${iy}`, ix * CHUNK + 8 / zoom, iy * CHUNK + 18 / zoom);
+    }
+  ctx.restore();
+}
+
+function drawTileGrid(view) {
+  const [x0, y0, x1, y1] = world.viewToGroundRect(view, 0);
+  ctx.save();
+  ctx.strokeStyle = 'rgba(244,234,210,0.18)';
+  ctx.lineWidth = 1 / zoom;
+  ctx.beginPath();
+  for (let i = Math.floor(x0 / T); i <= Math.ceil(x1 / T); i++) {
+    const a = toView(i * T, y0), b = toView(i * T, y1);
+    ctx.moveTo(a[0], a[1]);
+    ctx.lineTo(b[0], b[1]);
+  }
+  for (let j = Math.floor(y0 / T); j <= Math.ceil(y1 / T); j++) {
+    const a = toView(x0, j * T), b = toView(x1, j * T);
+    ctx.moveTo(a[0], a[1]);
+    ctx.lineTo(b[0], b[1]);
+  }
+  ctx.stroke();
+  ctx.restore();
 }
 
 let last = performance.now();
@@ -170,4 +236,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // gancho para testes automatizados (playwright)
-window.__game = { world, player, capy, cam, lighting, get fps() { return fps; } };
+window.__game = { world, player, capy, cam, lighting, debug, dbgFlags, get fps() { return fps; } };

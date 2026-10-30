@@ -63,7 +63,7 @@ export class Player {
     this.running = moving && input.down('ShiftLeft', 'ShiftRight') && !this.attack;
     if (this.running) this.lastRun = this.time;
 
-    let speed = this.running ? 230 : 115;
+    let speed = (this.running ? 230 : 115) * (this.speedMul || 1);
     if (this.attack) speed *= 0.3;
     const k = 1 - Math.exp(-dt * 14);
     this.vx += (ax * speed - this.vx) * k;
