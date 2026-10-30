@@ -75,6 +75,7 @@ export class Lighting {
 // Vinheta escura nas bordas da tela (cacheada por tamanho de tela).
 let vig = null;
 export function drawVignette(ctx, sw, sh) {
+  if (sw < 2 || sh < 2) return;
   if (!vig || vig.w !== sw || vig.h !== sh) {
     const c = document.createElement('canvas');
     c.width = Math.ceil(sw / 2);

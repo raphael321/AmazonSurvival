@@ -50,8 +50,10 @@ let hint = '';
 
 function resize() {
   dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-  sw = window.innerWidth;
-  sh = window.innerHeight;
+  // mede o próprio canvas: dentro de um iframe a janela pode começar com tamanho 0
+  sw = canvas.clientWidth || window.innerWidth;
+  sh = canvas.clientHeight || window.innerHeight;
+  if (!sw || !sh) return; // ainda sem tamanho: o ResizeObserver chama de novo
   canvas.width = Math.round(sw * dpr);
   canvas.height = Math.round(sh * dpr);
   // escala de renderização em degraus de 0.25, e o zoom se ajusta a ela: sprites e chunks
@@ -66,10 +68,14 @@ function resize() {
   setDeviceScale(rs);
 }
 let resizeTimer;
-window.addEventListener('resize', () => {
+const onResize = () => {
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(resize, 150);
-});
+  // primeira medida válida é imediata; as seguintes esperam o usuário parar de redimensionar
+  if (!sw || !sh) resize();
+  else resizeTimer = setTimeout(resize, 150);
+};
+window.addEventListener('resize', onResize);
+if (window.ResizeObserver) new ResizeObserver(onResize).observe(canvas);
 resize();
 
 const viewToWorld = (mx, my) => {
@@ -218,7 +224,23 @@ function drawTileGrid(view) {
 }
 
 let last = performance.now();
+let reported = false;
 function frame(now) {
+  // agenda o próximo quadro antes de tudo: um erro isolado não pode parar o jogo
+  requestAnimationFrame(frame);
+  if (!sw || !sh || !rs) { last = now; return; }
+  try {
+    step(now);
+  } catch (err) {
+    if (!reported) {
+      reported = true;
+      console.error(err);
+      if (window.__showError) window.__showError(String(err.stack || err));
+    }
+  }
+}
+
+function step(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   fpsAcc += now - (frame.prev || now);
@@ -232,7 +254,6 @@ function frame(now) {
   update(dt);
   render();
   input.endFrame();
-  requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
