@@ -1,6 +1,6 @@
 import { INK, PAL } from './palette.js';
 import { capsule, shaded, circle, hull, poly, ellipse } from './ink.js';
-import { P, depthOf } from '../engine/projection.js';
+import { P, depthOf, camDot, ISO_X, ISO_Y } from '../engine/projection.js';
 import { v3 } from '../engine/math.js';
 
 // Pinta o sobrevivente a partir da pose do esqueleto (pontos 3D no mundo).
@@ -96,16 +96,16 @@ function paintHead(g, pose) {
   g.beginPath();
   g.arc(hp[0], hp[1], R + 0.6, 0, Math.PI * 2);
   g.clip();
-  const back = [-f[0] * 4.2, -f[1] * 4.2 * 0.72 - 3.6];
+  const back = [(-f[0] + f[1]) * 4.2 * ISO_X, (-f[0] - f[1]) * 4.2 * ISO_Y - 3.6];
   shaded(g, circle(hp[0] + back[0], hp[1] + back[1], R * 0.98), PAL.hair, { off: 1.6, ink: 0 });
   g.restore();
 
   // olhos e nariz só quando o rosto está virado para a câmera
-  const toCam = f[1];
+  const toCam = camDot(f[0], f[1]);
   if (toCam > -0.25) {
     for (const side of [-1, 1]) {
       const dir = [f[0] * 0.88 + r[0] * side * 0.42, f[1] * 0.88 + r[1] * side * 0.42];
-      if (dir[1] < -0.15) continue;
+      if (camDot(dir[0], dir[1]) < -0.15) continue;
       const e = P(v3.add(pose.head, [dir[0] * 8.2, dir[1] * 8.2, -0.5]));
       g.fillStyle = INK;
       g.beginPath();
@@ -121,7 +121,7 @@ function paintHead(g, pose) {
   // orelha do lado visível
   for (const side of [-1, 1]) {
     const sx = r[0] * side, sy = r[1] * side;
-    if (sy < 0.25) continue;
+    if (camDot(sx, sy) < 0.25) continue;
     const e = P(v3.add(pose.head, [sx * 8.5 - f[0] * 1, sy * 8.5 - f[1] * 1, -1]));
     shaded(g, ellipse(e[0], e[1], 2, 2.8), PAL.skin, { off: 0.8, ink: 1.3 });
   }
@@ -139,7 +139,7 @@ function paintTrail(ctx, trail) {
     const alpha = Math.max(0, 1 - b.age / 0.16) * 0.8;
     const pts = [P(a.tip), P(b.tip), P(b.base), P(a.base)];
     ctx.globalAlpha = alpha;
-    ctx.fillStyle = '#f4ead2';
+    ctx.fillStyle = '#f7dc9a';
     ctx.beginPath();
     poly(pts)(ctx);
     ctx.fill();

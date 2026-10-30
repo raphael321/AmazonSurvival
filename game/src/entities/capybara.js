@@ -124,10 +124,11 @@ export class Capybara {
     const k = 1 - Math.exp(-dt * (this.state === 'flee' ? 8 : 5));
     this.vx += (tvx - this.vx) * k;
     this.vy += (tvy - this.vy) * k;
+    const px = this.x, py = this.y;
     this.x += this.vx * dt;
     this.y += this.vy * dt;
     const bx = this.x, by = this.y;
-    world.resolve(this, 20);
+    world.resolve(this, 20, px, py);
     // se bateu em algo ao vagar, desiste do alvo
     if (this.state === 'wander' && Math.hypot(bx - this.x, by - this.y) > 1) this.timer = Math.min(this.timer, -5.5);
 

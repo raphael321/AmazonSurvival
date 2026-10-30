@@ -1,6 +1,6 @@
 import { INK, PAL } from './palette.js';
 import { capsule, shaded, hull, poly, circle } from './ink.js';
-import { P, depthOf } from '../engine/projection.js';
+import { P, depthOf, camDot } from '../engine/projection.js';
 import { groundShadow } from './player-art.js';
 import { v3 } from '../engine/math.js';
 
@@ -65,7 +65,7 @@ export function paintCapybara(ctx, pose) {
     g.ellipse(m[0], m[1] + 1, 4.5, 3.5, 0, 0, Math.PI * 2);
     g.fill();
     // narinas
-    if (f[1] > -0.2) {
+    if (camDot(f[0], f[1]) > -0.2) {
       for (const s of [-1, 1]) {
         const n = P(v3.add(pose.muzzle, [f[0] * 6.8 + rt[0] * s * 2.4, f[1] * 6.8 + rt[1] * s * 2.4, 1]));
         g.fillStyle = INK;
@@ -74,8 +74,8 @@ export function paintCapybara(ctx, pose) {
     }
     // olhos (lado visível)
     for (const s of [-1, 1]) {
-      const sideY = rt[1] * s;
-      if (sideY < -0.2 && f[1] < 0.5) continue;
+      const side = camDot(rt[0] * s, rt[1] * s);
+      if (side < -0.2 && camDot(f[0], f[1]) < 0.5) continue;
       const e = P(v3.add(pose.cranium, [rt[0] * s * 6 + f[0] * 3, rt[1] * s * 6 + f[1] * 3, 3]));
       g.fillStyle = INK;
       g.beginPath();

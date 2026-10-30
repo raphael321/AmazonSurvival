@@ -1,6 +1,6 @@
 import { Input } from './engine/input.js';
 import { clamp } from './engine/math.js';
-import { GROUND_K } from './engine/projection.js';
+import { toView, groundFromView, sortKey } from './engine/projection.js';
 import { World } from './world/clearing.js';
 import { Player } from './entities/player.js';
 import { Capybara } from './entities/capybara.js';
@@ -8,6 +8,8 @@ import { paintPlayer } from './art/player-art.js';
 import { paintCapybara } from './art/capybara-art.js';
 import { Popups, drawHeart } from './art/fx.js';
 import { drawHud } from './systems/hud.js';
+import { Lighting, drawVignette } from './art/lighting.js';
+import { BG } from './world/terrain.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -15,10 +17,12 @@ const input = new Input(canvas);
 const params = new URLSearchParams(location.search);
 
 const world = new World(2026);
-const player = new Player(1300, 1120);
-const capy = new Capybara(1560, 1420);
+const player = new Player(...world.spawn);
+const capy = new Capybara(world.spawn[0] + 160, world.spawn[1] + 320);
+const lighting = new Lighting(world);
 const popups = new Popups();
-const cam = { x: player.x, y: player.y * GROUND_K - 40 };
+const camTarget = () => { const v = toView(player.x, player.y, 40); return v; };
+const cam = { x: camTarget()[0], y: camTarget()[1] };
 
 let sw = 0, sh = 0, dpr = 1, zoom = 1, rs = 0;
 let showFps = params.has('debug');
@@ -26,12 +30,12 @@ let fps = 60, fpsAcc = 0, fpsFrames = 0;
 let hint = '';
 
 function resize() {
-  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  dpr = Math.min(window.devicePixelRatio || 1, 1.5);
   sw = window.innerWidth;
   sh = window.innerHeight;
   canvas.width = Math.round(sw * dpr);
   canvas.height = Math.round(sh * dpr);
-  zoom = clamp(Math.sqrt(sw * sh) / 640, 0.9, 2.2);
+  zoom = clamp(Math.sqrt(sw * sh) / 720, 0.85, 2);
   const nrs = Math.round(dpr * zoom * 4) / 4; // degraus de 0.25 evitam repintar à toa
   if (nrs !== rs) {
     rs = nrs;
@@ -49,9 +53,9 @@ resize();
 const viewToWorld = (mx, my) => {
   const vx = (mx - sw / 2) / zoom + cam.x;
   const vy = (my - sh / 2) / zoom + cam.y;
-  return [vx, vy / GROUND_K];
+  return groundFromView(vx, vy);
 };
-const headPos = (e, h) => [e.x, e.y * GROUND_K - h];
+const headPos = (e, h) => { const v = toView(e.x, e.y); return [v[0], v[1] - h]; };
 
 function onStrike(p) {
   const fx = Math.cos(p.angle), fy = Math.sin(p.angle);
@@ -108,14 +112,10 @@ function update(dt) {
   else if (!capy.tamed && dCapy < 260 && player.running) hint = 'Correndo assusta a capivara. Ande devagar.';
 
   // câmera segue o jogador com suavização
-  const tx = player.x, ty = player.y * GROUND_K - 40;
+  const [tx, ty] = camTarget();
   const k = 1 - Math.exp(-dt * 6);
   cam.x += (tx - cam.x) * k;
   cam.y += (ty - cam.y) * k;
-  const hw = sw / 2 / zoom, hh = sh / 2 / zoom;
-  const VW = world.W, VH = world.H * GROUND_K;
-  cam.x = hw * 2 >= VW ? VW / 2 : clamp(cam.x, hw, VW - hw);
-  cam.y = hh * 2 >= VH ? VH / 2 : clamp(cam.y, hh, VH - hh);
 }
 
 function render() {
@@ -126,13 +126,16 @@ function render() {
     x0: cam.x - sw / 2 / zoom, x1: cam.x + sw / 2 / zoom,
     y0: cam.y - sh / 2 / zoom, y1: cam.y + sh / 2 / zoom,
   };
+  ctx.fillStyle = BG;
+  ctx.fillRect(view.x0 - 2, view.y0 - 2, view.x1 - view.x0 + 4, view.y1 - view.y0 + 4);
   world.drawGround(ctx, view);
 
   const list = world.drawables(view, player);
-  list.push({ y: player.y, draw: (g) => paintPlayer(g, player.pose, player.trail) });
-  list.push({ y: capy.y, draw: (g) => paintCapybara(g, capy.pose) });
-  list.sort((a, b) => a.y - b.y);
+  list.push({ key: sortKey(player.x, player.y), draw: (g) => paintPlayer(g, player.pose, player.trail) });
+  list.push({ key: sortKey(capy.x, capy.y), draw: (g) => paintCapybara(g, capy.pose) });
+  list.sort((a, b) => a.key - b.key);
   for (const d of list) d.draw(ctx);
+  lighting.apply(ctx, view, world.time);
 
   // corações de confiança sobre a capivara quando o jogador está perto
   const dCapy = Math.hypot(capy.x - player.x, capy.y - player.y);
@@ -143,6 +146,7 @@ function render() {
   popups.draw(ctx);
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawVignette(ctx, sw, sh);
   drawHud(ctx, sw, sh, { player, capy, hint, fps, showFps });
 }
 
@@ -166,4 +170,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // gancho para testes automatizados (playwright)
-window.__game = { world, player, capy, cam, get fps() { return fps; } };
+window.__game = { world, player, capy, cam, lighting, get fps() { return fps; } };

@@ -7,6 +7,8 @@
 - Leitura clara a distância: silhuetas fortes; criaturas sempre se destacam do fundo (fundo mais dessaturado, personagens mais saturados).
 - Movimento > detalhe: animação fluida com antecipação e recuperação vale mais que textura.
 - Proibido: gradientes "de app", brilho plástico, contornos finos cinza, estética genérica de asset store.
+- **Exceção: luz.** Poças de sol, raios de luz, vinheta e a queda para o abismo podem usar gradiente suave (é iluminação, não estilo de forma).
+- **Volume isométrico:** terreno em blocos com face de cima + faces laterais (sul = clara, leste = escura), barrancos com estratos e raízes, mapa como um diorama que cai no escuro nas bordas (referência: thumbnail do Dunloc).
 
 ## Paleta base (ajustável, mas registre mudanças em 07-decisoes.md)
 

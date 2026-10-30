@@ -39,28 +39,37 @@ export function paintSamauma(seed, rs) {
   const nf = 6;
   for (let i = 0; i < nf; i++) {
     const a = (i / nf) * Math.PI * 2 + r() * 0.5;
-    fins.push({ a, L: 80 + r() * 45, h: 70 + r() * 50, t: 7 + r() * 4 });
+    fins.push({ a, L: 85 + r() * 40, h: 80 + r() * 40, t: 12 + r() * 5 });
   }
+  // ground(dirx, diry, dist) -> ponto de vista no chão isométrico
+  const gp = (c, sn, d, z = 0) => [(c - sn) * d * 0.7071, (c + sn) * d * 0.41 - z * 0.86];
+  // raiz tabular: parede curva e alta que desce afinando até o chão, topo arredondado
   const fin = (ctx, f) => {
-    const c = Math.cos(f.a), s = Math.sin(f.a);
-    const px = -s * f.t, py = c * f.t * 0.72;
-    const top = [c * 16, s * 16 * 0.72 - f.h];
-    const tip = [c * f.L, s * f.L * 0.72];
-    const ctl = [c * f.L * 0.45, s * f.L * 0.45 * 0.72 - f.h * 0.2];
-    const base1 = [c * 18 + px, s * 18 * 0.72 + py];
-    const base2 = [c * 18 - px, s * 18 * 0.72 - py];
+    const c = Math.cos(f.a), sn = Math.sin(f.a);
+    const top = gp(c, sn, 20, f.h);
+    const shoulder = gp(c, sn, f.L * 0.45, f.h * 0.55);
+    const tip = gp(c, sn, f.L, 0);
+    const foot = gp(c, sn, 22, 0);
+    const px = -(c + sn) * 0.5 * f.t, py = (c - sn) * 0.25 * f.t; // espessura perpendicular
     shaded(ctx, (g) => {
-      g.moveTo(top[0] - px * 0.4, top[1]);
-      g.quadraticCurveTo(ctl[0] - px, ctl[1] - py, tip[0], tip[1]);
-      g.lineTo(base1[0], base1[1]);
-      g.lineTo(base2[0], base2[1]);
-      g.quadraticCurveTo(ctl[0] + px, ctl[1] + py, top[0] + px * 0.4, top[1]);
+      g.moveTo(top[0], top[1]);
+      g.bezierCurveTo(shoulder[0], shoulder[1] - 8, tip[0] - (tip[0] - foot[0]) * 0.15, tip[1] - 14, tip[0], tip[1]);
+      g.lineTo(tip[0] + px * 0.6, tip[1] + py * 0.6 + 2);
+      g.lineTo(foot[0] + px, foot[1] + py + 2);
+      g.lineTo(foot[0], foot[1]);
       g.closePath();
-    }, PAL.bark, { off: 4, ink: 2.2 });
+    }, PAL.bark, { off: 5, ink: 2.4 });
+    // aresta de cima iluminada
+    ctx.strokeStyle = PAL.bark[2];
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(top[0] - 1, top[1] + 2);
+    ctx.bezierCurveTo(shoulder[0] - 1, shoulder[1] - 6, tip[0] - (tip[0] - foot[0]) * 0.15 - 1, tip[1] - 12, tip[0] - 2, tip[1] - 1);
+    ctx.stroke();
   };
 
   const trunk = makeSprite(360, 470, 180, 390, rs, (ctx) => {
-    fins.filter((f) => Math.sin(f.a) < 0).forEach((f) => fin(ctx, f));
+    fins.filter((f) => Math.cos(f.a) + Math.sin(f.a) < 0).sort((p, q) => (Math.cos(p.a) + Math.sin(p.a)) - (Math.cos(q.a) + Math.sin(q.a))).forEach((f) => fin(ctx, f));
     // galhos que sobem para a copa
     const br = [[-120, -H - 50, 15], [110, -H - 60, 15], [-50, -H - 80, 12], [60, -H - 75, 11]];
     for (const [bx, by, w] of br) capsule(ctx, [bx * 0.2, -H + 10], [bx, by], w, PAL.bark, 2.2);
@@ -86,7 +95,7 @@ export function paintSamauma(seed, rs) {
       ctx.quadraticCurveTo(x + 3, y0 - len / 2, x, y0 - len);
       ctx.stroke();
     }
-    fins.filter((f) => Math.sin(f.a) >= 0).sort((a, b) => Math.sin(a.a) - Math.sin(b.a)).forEach((f) => fin(ctx, f));
+    fins.filter((f) => Math.cos(f.a) + Math.sin(f.a) >= 0).sort((p, q) => (Math.cos(p.a) + Math.sin(p.a)) - (Math.cos(q.a) + Math.sin(q.a))).forEach((f) => fin(ctx, f));
   });
 
   const canopy = makeSprite(560, 300, 280, 240, rs, (ctx) => {
@@ -197,7 +206,7 @@ export function paintBush(seed, rs, { fruit = false, scale = 1 } = {}) {
   const r = rng(seed);
   const w = (60 + r() * 30) * scale, h = (40 + r() * 20) * scale;
   const sprite = makeSprite(w + 40, h + 60, (w + 40) / 2, h + 30, rs, (ctx) => {
-    leafMass(ctx, r, { w, h, cy: 6, n: Math.round(10 * scale) + 4, size: 15 * scale, light: 0.6, dark: fruit ? 0.12 : 0.05 });
+    leafMass(ctx, r, { w, h, cy: 6, n: Math.round(10 * scale) + 4, size: 15 * scale, light: 0.42, dark: fruit ? 0.1 : 0.02 });
   });
   const fruits = [];
   if (fruit) {
@@ -233,4 +242,30 @@ export function paintRock(seed, rs, size = 1) {
     ctx.lineTo(w * 0.1, -h * 0.15);
     ctx.stroke();
   });
+}
+
+// ---------- Árvore da parede de mata (variações reaproveitadas) ----------
+export function paintForestTree(seed, rs) {
+  const r = rng(seed);
+  const H = 230 + r() * 80;
+  const lean = (r() - 0.5) * 30;
+  const trunk = makeSprite(160, H + 60, 80, H + 30, rs, (ctx) => {
+    // sapopemas pequenas
+    for (const k of [-1, 1]) capsule(ctx, [k * 4, -26], [k * 22, 4], 6, ['#2b2619', '#3c3524', '#4e4630'], 1.8);
+    const pts = [];
+    for (let i = 0; i <= 6; i++) { const t = i / 6; pts.push([-(11 - t * 4) + lean * t, -t * H]); }
+    for (let i = 6; i >= 0; i--) { const t = i / 6; pts.push([(11 - t * 4) + lean * t, -t * H]); }
+    shaded(ctx, poly(pts), ['#2b2619', '#3c3524', '#4e4630'], { off: 4, ink: 2.2 });
+    // cipó
+    ctx.strokeStyle = '#2c5a3a';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(-8, -H * 0.9);
+    ctx.bezierCurveTo(14, -H * 0.6, -14, -H * 0.4, 6, -H * 0.1);
+    ctx.stroke();
+  });
+  const canopy = makeSprite(380, 260, 190, 200, rs, (ctx) => {
+    leafMass(ctx, r, { w: 320, h: 150, cy: 0, n: 30, size: 40, light: 0.38, dark: 0 });
+  });
+  return { trunk, canopy, canopyY: -H + 30, canopyX: lean };
 }

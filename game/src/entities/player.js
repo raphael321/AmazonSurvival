@@ -1,6 +1,7 @@
 import { Rig } from '../skeleton/rig.js';
 import { solveTwoBone } from '../skeleton/ik.js';
 import { v3, angleLerp, clamp, lerp, easeInOut, easeOut } from '../engine/math.js';
+import { screenDirToWorld } from '../engine/projection.js';
 
 const PELVIS = 34;
 const ARM = [14, 14];
@@ -27,7 +28,7 @@ export class Player {
     this.y = y;
     this.vx = 0;
     this.vy = 0;
-    this.angle = Math.PI / 2; // virado para o sul (câmera)
+    this.angle = Math.PI / 4; // virado para a câmera
     this.running = false;
     this.hp = 100;
     this.maxHp = 100;
@@ -57,7 +58,7 @@ export class Player {
 
   update(dt, input, world, aim, onStrike) {
     this.time += dt;
-    const [ax, ay] = input.axis();
+    const [ax, ay] = screenDirToWorld(...input.axis());
     const moving = ax !== 0 || ay !== 0;
     this.running = moving && input.down('ShiftLeft', 'ShiftRight') && !this.attack;
     if (this.running) this.lastRun = this.time;
@@ -88,9 +89,10 @@ export class Player {
       this.angle = angleLerp(this.angle, Math.atan2(this.vy, this.vx), 1 - Math.exp(-dt * 12));
     }
 
+    const px = this.x, py = this.y;
     this.x += this.vx * dt;
     this.y += this.vy * dt;
-    world.resolve(this, 12);
+    world.resolve(this, 12, px, py);
 
     this.rig.update(dt, this.x, this.y, this.angle, this.vx, this.vy, {
       rootZ: this.bobZ,
@@ -164,7 +166,7 @@ export class Player {
     for (const p of this.trail) p.age += dt;
     this.trail = this.trail.filter((p) => p.age < 0.16);
     const t = this.attack ? this.attack.t : -1;
-    if (t > T_ANTIC - 0.03 && t < T_ANTIC + T_STRIKE + T_HOLD) {
+    if (t >= T_ANTIC && t < T_ANTIC + T_STRIKE + T_HOLD) {
       this.trail.unshift({ tip: bladeTip, base: v3.add(bladeBase, v3.scale(bd, 9)), age: 0 });
     }
   }
