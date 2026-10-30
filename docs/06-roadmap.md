@@ -6,12 +6,12 @@ Regra de ouro: **cada etapa termina jogável no navegador** e verificada com scr
 
 Objetivo: provar a técnica (esqueleto + IK + pintura por código) no nosso tema.
 
-- [ ] Clareira de várzea pintada por código (chão, samaúma, açaizeiros, arbustos, pedras), cacheada offscreen; vento balança folhas
-- [ ] Jogador bípede com esqueleto invisível + IK, anda em 8 direções (WASD), câmera 3/4 seguindo
-- [ ] Ação de golpe com facão (clique): antecipação → golpe → recuperação, com rastro
-- [ ] Uma **capivara** quadrúpede andando com marcha procedural, comportamento simples (vagar, fugir se correr perto)
-- [ ] Domar a capivara oferecendo fruta (tecla E perto dela, devagar) → ela passa a seguir o jogador
-- [ ] 60 FPS medido; zero imagens carregadas (verificar na aba Network)
+- [x] Clareira de várzea pintada por código (chão, samaúma, açaizeiros, arbustos, pedras), cacheada offscreen; vento balança folhas
+- [x] Jogador bípede com esqueleto invisível + IK, anda em 8 direções (WASD), câmera 3/4 seguindo
+- [x] Ação de golpe com facão (clique): antecipação → golpe → recuperação, com rastro
+- [x] Uma **capivara** quadrúpede andando com marcha procedural, comportamento simples (vagar, fugir se correr perto)
+- [x] Domar a capivara oferecendo fruta (tecla E perto dela, devagar) → ela passa a seguir o jogador
+- [x] 60 FPS medido; zero imagens carregadas (verificar na aba Network)
 
 Prompt: `prompts/01-piloto.md`
 
@@ -41,6 +41,7 @@ Prompt: `prompts/01-piloto.md`
 
 ## Etapa 3 — Lendas e social (v3)
 
+- [ ] **Ecos do Cretáceo** (sítios fósseis): Amazonsaurus (carga gigante), Oxalaia (chefe/montaria do rio), Pycnonemosaurus (predador de terra firme) — exige esqueletos de pescoço/cauda em corrente e terópode
 - [ ] Chefes: Mapinguari (terra firme), Purussaurus (rio), Boitatá (evento)
 - [ ] Co-op 2–4 (WebSocket)
 - [ ] Telegram Mini App

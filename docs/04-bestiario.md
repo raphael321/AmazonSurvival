@@ -1,8 +1,8 @@
 # 04 — Bestiário
 
-Esqueletos: **B** bípede · **Q** quadrúpede · **S** serpente/corrente · **A** ave · **R** réptil baixo (quadrúpede baixo + cauda corrente) · **P** peixe
+Esqueletos: **B** bípede · **T** terópode (bípede horizontal + cauda) · **Q** quadrúpede · **Q+C** quadrúpede com pescoço/cauda em corrente · **S** serpente/corrente · **A** ave · **R** réptil baixo (quadrúpede baixo + cauda corrente) · **P** peixe
 
-Tiers: **T1** início · **T2** meio · **T3** megafauna · **M** mítico (folclore)
+Tiers: **T1** início · **T2** meio · **T3** megafauna · **T4** ecos do Cretáceo (dinossauros) · **M** mítico (folclore)
 
 ## Fauna atual
 
@@ -34,6 +34,21 @@ Tiers: **T1** início · **T2** meio · **T3** megafauna · **M** mítico (folcl
 | **Purussaurus** | R | T3 (chefe) | Jacaré de 10+ m do Acre. Chefe do rio; domável só no fim | Evento de chefe; requer base pronta |
 
 > Mostrar com fidelidade aproximada à paleontologia é parte do charme. Os nomes científicos aparecem num "Diário do Naturalista" in-game.
+
+## Ecos do Cretáceo (dinossauros da Amazônia Legal)
+
+Camada mais profunda do jogo: os sítios fósseis "despertam" dinossauros reais descobertos no Brasil. Ficam **depois** da megafauna (são ~100 milhões de anos mais antigos, então no jogo são "ecos" e não fauna viva). Esqueleto **T** = terópode: bípede com coluna horizontal e cauda em corrente (reaproveitável na ave-do-terror). Esqueleto **Q+C** = quadrúpede com pescoço e cauda em corrente.
+
+| Criatura | Esq. | Tier | Papel | Como domar (ideia) |
+|---|---|---|---|---|
+| **Amazonsaurus maranhensis** (Amazonssauro) | Q+C | T4 | Saurópode de médio porte (~110 Ma, Maranhão), o primeiro dinossauro achado na Amazônia Legal. Gigante de carga: carrega a base e derruba árvores | Paciência: alimentar com folhas altas por vários dias, sem predadores por perto |
+| **Oxalaia quilombensis** | T | T4 (chefe do rio) | Espinossaurídeo (~100 Ma, Maranhão), o maior carnívoro da região (estimado em até 14 m). Semiaquático e pescador: montaria/chefe do rio, rival do Purussaurus | Evento de chefe na cheia; depois de vencido, domar com peixe grande (pirarucu) |
+| **Pycnonemosaurus nevesi** | T | T4 | Abelissaurídeo (~70 Ma, Mato Grosso), o maior da família na América (~9 m). Braços minúsculos, cabeça curta e alta. Predador de emboscada da terra firme | Nocautear (timbó) + carne; muito agressivo |
+
+Notas de pesquisa:
+- Fonte enviada pelo Raphael: infográfico "Dinossauros da Amazônia" (Portal Amazônia; arte Gabriel Veras, ilustrações Jurassic Fandom). Serve só de referência de leitura. **Não copiar** as ilustrações: a nossa arte é desenhada por código.
+- O Oxalaia é conhecido por fragmentos do focinho/crânio: o corpo inteiro é reconstrução por comparação com outros espinossaurídeos. Os tamanhos são estimativas. Citar isso no Diário do Naturalista.
+- Ordem de produção sugerida: Pycnonemosaurus primeiro (o esqueleto T é o mesmo da ave-do-terror), depois o Oxalaia (T + água) e por último o Amazonsaurus (corrente longa de pescoço/cauda).
 
 ## Folclore (camada mítica)
 
