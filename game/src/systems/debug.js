@@ -185,7 +185,7 @@ export class DebugPanel {
     let txt =
       `FPS            ${info.fps.toFixed(0)}\n` +
       `tile           ${ti}, ${tj}  (${bio})\n` +
-      `chunks         ${world.chunks.size} na memória\n` +
+      `chunks         ${world.chunks.size} na memória (${(world.stats.chunkMB || 0).toFixed(0)} MB, escala ${world.rs})\n` +
       `fila           ${world.stats.queue} esperando\n` +
       `pintura        ${world.stats.paintMs.toFixed(1)} ms/chunk  (${(world.stats.frameMs || 0).toFixed(1)} ms neste quadro)\n` +
       `em andamento   ${world.jobs.size} chunk(s)\n` +

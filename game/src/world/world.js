@@ -4,7 +4,7 @@ import { drawSprite, drawSwaying, tintSprite } from '../art/sprite.js';
 import { Gen, T, BLOCK, DEFAULTS } from './gen.js';
 import { CHUNK, chunkPainter, drawWater } from './terrain.js';
 
-const MAX_CHUNKS = 90; // limite de memória dos chunks de chão (LRU)
+const CHUNK_BUDGET_MB = 160; // memória máxima dos chunks de chão (LRU)
 const MAX_BLOCKS = 160; // limite de blocos de objetos (LRU)
 const LIGHT_LEVELS = [0.5, 0.64, 0.8, 0.96];
 // caixa de cada tipo de sprite na vista: [altura acima da base, meia-largura]
@@ -159,6 +159,9 @@ export class World {
       }
     }
     this.stats.queue = want.length;
+    // nunca descartar o que está na tela + anel
+    this.minChunks = (vx1 - vx0 + 1 + ring * 2) * (vy1 - vy0 + 1 + ring * 2);
+    this.stats.chunkMB = this.chunks.size * (CHUNK * this.groundRs) ** 2 * 4 / 1048576;
     this.stats.frameMs = performance.now() - t0;
     this.evict();
   }
@@ -172,7 +175,9 @@ export class World {
         this.stats.evicted++;
       }
     };
-    lru(this.chunks, MAX_CHUNKS);
+    // limite pela memória: bytes por chunk dependem da escala (4 bytes por pixel)
+    const mb = (CHUNK * this.groundRs) ** 2 * 4 / 1048576;
+    lru(this.chunks, Math.max(this.minChunks || 0, Math.floor(CHUNK_BUDGET_MB / mb)));
     lru(this.blocks, MAX_BLOCKS);
   }
 

@@ -56,7 +56,8 @@ function resize() {
   canvas.height = Math.round(sh * dpr);
   // escala de renderização em degraus de 0.25, e o zoom se ajusta a ela: sprites e chunks
   // são copiados 1:1 na tela (sem reamostrar a cada quadro) e não repintam à toa
-  const nrs = Math.max(0.75, Math.round(dpr * clamp(Math.sqrt(sw * sh) / 720, 0.85, 2) * 4) / 4);
+  // teto de 2: acima disso cada chunk passa de 4 MB e telas grandes estouram a memória de canvas
+  const nrs = clamp(Math.round(dpr * clamp(Math.sqrt(sw * sh) / 720, 0.85, 2) * 4) / 4, 0.75, 2);
   zoom = nrs / dpr;
   if (nrs !== rs) {
     rs = nrs;
