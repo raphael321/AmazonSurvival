@@ -8,9 +8,12 @@ import { Popups, drawHeart } from '../../game/src/art/fx.js';
 import { World3D } from './world3d.js';
 import { DEFAULTS3D } from './field.js';
 import { PlayerMesh, CapybaraMesh } from './actors3d.js';
-import { toon } from './toon.js';
 import { loadModels } from './assets.js';
 import { GameMap } from './map3d.js';
+import { updateWind, windSettings } from './wind.js';
+import { Grass, grassSettings } from './grass.js';
+import { Water } from './water.js';
+import { WindTrails, Campfire } from './fx3d.js';
 
 // Piloto 3D do Amazon Survival (Three.js). Reaproveita do 2D: gerador Perlin, esqueleto
 // com IK, lógica do jogador e da capivara, HUD. Coordenadas do jogo -> three: (x, z, y).
@@ -48,13 +51,6 @@ sun.shadow.normalBias = 1.5;
 scene.add(sun, sun.target);
 const SUN_DIR = new THREE.Vector3(-0.85, 1.1, -0.15).normalize();
 
-// água: plano que acompanha o jogador na altura 0
-const water = new THREE.Mesh(
-  new THREE.PlaneGeometry(9000, 9000).rotateX(-Math.PI / 2),
-  toon('#7a5f38', { transparent: true, opacity: 0.86 }),
-);
-water.receiveShadow = true;
-scene.add(water);
 
 const camera = new THREE.PerspectiveCamera(32, 1, 10, 9000);
 
@@ -75,6 +71,12 @@ capy.height = 52;
 // modelos 3D carregam em segundo plano: o mundo abre na hora e eles aparecem ao chegar
 loadModels(window.__ASSET_BASE || '').then((m) => { world.setModels(m); world.addShowcase(spawn[0], spawn[1], [0, 2, 3]); }).catch((e) => console.warn('modelos não carregaram', e));
 const gameMap = new GameMap(world);
+// clima: água com rio correndo, gramado em volta do personagem, traços de vento e fogueira
+const water = new Water(scene, world);
+const grass = new Grass(scene, world);
+const trails = new WindTrails(scene, world);
+const fireSpot = world.findSpawn(spawn[0] - 220, spawn[1] + 120);
+const campfire = new Campfire(scene, world, fireSpot[0], fireSpot[1]);
 const playerMesh = new PlayerMesh(scene);
 const capyMesh = new CapybaraMesh(scene);
 const popups = new Popups();
@@ -112,6 +114,8 @@ const rebuild = () => {
     if (!world.isFree(capy.x, capy.y, 22)) [capy.x, capy.y] = world.findSpawn(player.x + 150, player.y + 150);
     capy.home = [capy.x, capy.y];
     if (world.pool.models) world.addShowcase(player.x, player.y, [0, 2, 3]);
+    grass.reset();
+    water.reset();
   }, 150);
 };
 for (const [title, subs] of groups) {
@@ -121,6 +125,13 @@ for (const [title, subs] of groups) {
     for (const [key, label, min, max, step] of items) s.addBinding(params, key, { label, min, max, step }).on('change', rebuild);
   }
 }
+const windF = pane.addFolder({ title: 'Vento e grama', expanded: false });
+windF.addBinding(windSettings, 'strength', { label: 'força do vento', min: 0, max: 2.5, step: 0.05 });
+windF.addBinding(windSettings, 'direction', { label: 'direção (°)', min: 0, max: 360, step: 1 });
+windF.addBinding(windSettings, 'gust', { label: 'rajadas', min: 0, max: 1, step: 0.05 });
+windF.addBinding(grassSettings, 'radius', { label: 'raio da grama', min: 250, max: 1200, step: 10 });
+windF.addBinding(grassSettings, 'density', { label: 'densidade', min: 0, max: 2, step: 0.05 }).on('change', () => grass.reset());
+windF.addBinding(grassSettings, 'height', { label: 'altura', min: 0.3, max: 2, step: 0.05 });
 const camF = pane.addFolder({ title: 'Câmera e mundo', expanded: false });
 camF.addBinding(view, 'distance', { label: 'distância', min: 400, max: 4000, step: 10 });
 camF.addBinding(view, 'pitch', { label: 'inclinação', min: 15, max: 80, step: 1 });
@@ -237,7 +248,11 @@ function update(dt) {
   scene.fog.far = D * 3.2;
   sun.position.copy(target).addScaledVector(SUN_DIR, 1800);
   sun.target.position.copy(target);
-  water.position.set(Math.round(target.x / 500) * 500, 0, Math.round(target.z / 500) * 500);
+  updateWind(world.time);
+  water.update(player.x, player.y);
+  grass.update(player.x, player.y, player.z);
+  trails.update(dt, world.time, player.x, player.y);
+  campfire.update(dt, world.time, camera, sh);
   playerMesh.update(player);
   capyMesh.update(capy);
   gameMap.update(dt, player);
@@ -276,4 +291,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__game = { gameMap, world, player, capy, camera, renderer, scene, view, params, get fps() { return fps; } };
+window.__game = { grass, grassSettings, windSettings, water, trails, campfire, gameMap, world, player, capy, camera, renderer, scene, view, params, get fps() { return fps; } };

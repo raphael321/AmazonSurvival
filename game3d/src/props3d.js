@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { toon, INK_MATERIAL } from './toon.js';
 import { deckHeight } from './physics3d.js';
+import { swaying } from './wind.js';
 
 // Objetos da mata em 3D low-poly, gerados por código (sem arquivos).
 // Cada tipo é um InstancedMesh por chunk: uma chamada de desenho para todos daquele tipo.
@@ -180,21 +181,22 @@ export class PropPool {
     this.models = null;
     this.dirty = true;
     const G = geometries(), M = MAT();
-    const proc = (name, geo, mat, ink, cast = true) => this.define(name, G[geo], mat, ink ? G.ink[geo] : null, cast);
+    const proc = (name, geo, mat, ink, cast = true, sway = false) => this.define(name, G[geo], sway ? swaying(mat) : mat, ink ? G.ink[geo] : null, cast, sway);
     proc('samaumaTrunk', 'samaumaTrunk', M.bark, true);
-    proc('samaumaCanopy', 'samaumaCanopy', M.leaf, true);
+    proc('samaumaCanopy', 'samaumaCanopy', M.leaf, true, true, true);
     proc('acaiTrunk', 'acaiTrunk', M.bark, true);
-    proc('acaiCrown', 'acaiCrown', M.frond, false);
-    proc('acaiFruit', 'acaiFruit', M.acai, false);
-    proc('bush', 'bush', M.bushLeaf, true, false);
+    proc('acaiCrown', 'acaiCrown', M.frond, false, true, true);
+    proc('acaiFruit', 'acaiFruit', M.acai, false, true, true);
+    proc('bush', 'bush', M.bushLeaf, true, false, true);
     proc('rock', 'rock', M.stone, true);
     proc('forestTrunk', 'forestTrunk', M.darkBark, false);
-    proc('forestCanopy', 'forestCanopy', M.darkLeaf, true);
-    proc('fruit', 'fruit', M.fruit, false, false);
+    proc('forestCanopy', 'forestCanopy', M.darkLeaf, true, true, true);
+    proc('fruit', 'fruit', M.fruit, false, false, true);
   }
 
-  define(name, geo, mat, inkGeo, cast) {
-    this.entries.set(name, { name, geo, mat, inkGeo, cast, mesh: null, ink: null, cap: 0, mats: [] });
+  // sway: folhagem que balança com o vento (o contorno de tinta balança junto)
+  define(name, geo, mat, inkGeo, cast, sway = false) {
+    this.entries.set(name, { name, geo, mat, inkGeo, cast, sway, mesh: null, ink: null, cap: 0, mats: [] });
   }
 
   setModels(models, inflate) {
@@ -203,10 +205,12 @@ export class PropPool {
       const scale = (TARGET_H[name] || 60) / Math.max(0.001, m.size.y);
       m.scale = scale;
       // sombra só de objetos médios/grandes: os pequenos dobrariam o custo do passe de sombra à toa
-      this.define('m:' + name, m.geometry, m.material, inflate(m.geometry, 1.6 / scale), SIZE(name) !== 'small' && !name.startsWith('moita') && !name.startsWith('samambaia'));
+      // pedras, troncos, tocos e construções ficam firmes; árvores, moitas, samambaias balançam
+      const sway = !MESH_PHYS.has(name) && name !== 'ponte' && name !== 'ouricos_castanha';
+      this.define('m:' + name, m.geometry, sway ? swaying(m.material) : m.material, inflate(m.geometry, 1.6 / scale), SIZE(name) !== 'small' && !name.startsWith('moita') && !name.startsWith('samambaia'), sway);
       this.entries.get('m:' + name).far = FAR[SIZE(name)];
       if (m.lod) {
-        this.define('m:' + name + '@lod', m.lod.geometry, m.lod.material, inflate(m.lod.geometry, 1.6 / scale), false);
+        this.define('m:' + name + '@lod', m.lod.geometry, sway ? swaying(m.lod.material) : m.lod.material, inflate(m.lod.geometry, 1.6 / scale), false, sway);
         this.entries.get('m:' + name + '@lod').far = FAR[SIZE(name)];
       }
     }
@@ -297,7 +301,7 @@ export class PropPool {
     e.mesh.receiveShadow = true;
     this.scene.add(e.mesh);
     if (e.inkGeo) {
-      e.ink = new THREE.InstancedMesh(e.inkGeo, INK_MATERIAL, cap);
+      e.ink = new THREE.InstancedMesh(e.inkGeo, e.sway ? swaying(INK_MATERIAL) : INK_MATERIAL, cap);
       e.ink.instanceMatrix = e.mesh.instanceMatrix; // mesmas posições do objeto
       e.ink.frustumCulled = false;
       this.scene.add(e.ink);
