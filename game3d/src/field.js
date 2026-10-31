@@ -11,6 +11,9 @@ export const DEFAULTS3D = {
   terrace: 0, // 0 = encosta suave, 1 = degraus de bloco (estilo 2D)
   maxSlope: 1.1, // inclinação máxima que dá para subir (tangente)
   deco: 0.02, // troncos, tocos, ouriços de castanha
+  build: 0.01, // construções espalhadas (pré-visualização)
+  bridges: 0.75, // chance de ponte em cada trecho de rio (por chunk)
+  bridgeSpan: 520, // vão máximo de uma ponte
 };
 
 const smooth = (a, b, x) => {

@@ -107,6 +107,7 @@ const MODEL_SETS = {
   camu: ['moita_folhas'],
   colhido: ['moita'],
   rock: ['pedra_capim', 'pedra_achatada', 'pedra_musgo', 'pedras_grupo', 'menir', 'pedra_musgo2'],
+  build: ['bancada', 'ponte', 'portao', 'sela'],
   deco: ['tronco_caido', 'tronco_musgo', 'tronco', 'toco_raizes', 'toco_cortado', 'toco_a', 'toco_b', 'arco_raiz', 'ouricos_castanha'],
 };
 const TARGET_H = {
@@ -114,12 +115,14 @@ const TARGET_H = {
   samambaia_fruto: 80, moita_flores: 55, cogumelos: 45, galho_cogumelo: 60, pedra_capim: 62, pedra_achatada: 45,
   pedra_musgo: 60, pedras_grupo: 50, menir: 140, pedra_musgo2: 65, tronco_caido: 62, tronco_musgo: 56, tronco: 46,
   toco_raizes: 58, toco_cortado: 46, toco_a: 40, toco_b: 44, arco_raiz: 85, ouricos_castanha: 30,
+  // construções (modelos do Raphael)
+  bancada: 82, ponte: 105, portao: 230, sela: 58,
 };
 // distância máxima de desenho por tamanho (além disso a neblina já esconde)
 const FAR = { big: 3400, mid: 2200, small: 1400 };
 const LOD_NEAR = 850; // além disso usa a versão de baixo detalhe
 const SIZE = (name) => (TARGET_H[name] || 0) >= 130 ? 'big' : (TARGET_H[name] || 0) >= 58 ? 'mid' : 'small';
-const SOLID = new Set(['tronco_caido', 'tronco_musgo', 'tronco', 'toco_raizes', 'toco_cortado', 'toco_a', 'toco_b', 'arco_raiz']);
+const SOLID = new Set(['bancada', 'portao', 'sela', 'tronco_caido', 'tronco_musgo', 'tronco', 'toco_raizes', 'toco_cortado', 'toco_a', 'toco_b', 'arco_raiz']);
 
 function hash2(i, j, s) {
   let h = Math.imul(i, 374761393) ^ Math.imul(j, 668265263) ^ Math.imul(s, 2147483647);
@@ -141,10 +144,26 @@ export function buildProps(world, ci, cj) {
       if (!world.walkable(px, py) || field.H(px, py) < 4) continue;
       list.push({ id: i + ',' + j + 'd', kind: 'deco', x: px, y: py, variant: Math.floor(hash2(i, j, seed + 419) * 9), shadow: 24 });
     }
-  for (const q of list) {
+  // construções espalhadas (por enquanto só para ver no mundo)
+  for (let y = 0; y < B; y += 2)
+    for (let x = 0; x < B; x += 2) {
+      const i = ci * B + x, j = cj * B + y;
+      if (hash2(i, j, seed + 503) >= (p.build ?? 0.01)) continue;
+      const px = (i + 0.5) * T, py = (j + 0.5) * T;
+      if (!world.walkable(px, py) || field.slope(px, py) > 0.35) continue;
+      // pontes não entram aqui: elas são colocadas sobre os rios (bridges3d.js)
+      const variant = [0, 2, 3][Math.floor(hash2(i, j, seed + 509) * 3)];
+      list.push({ id: i + ',' + j + 'b', kind: 'build', x: px, y: py, variant, shadow: 40 });
+    }
+  // nada nasce na água (o rio 3D é escavado depois da grade do gerador) nem sobre pontes
+  // objetos com colisão também ficam longe do caminho da ponte (cabeceiras livres)
+  const keep = list.filter((q) => field.H(q.x, q.y) > 1.5 && world.bridges.distToDeck(q.x, q.y) > world.bridges.halfWidth + (q.collider || 0) + 8);
+  for (const q of keep) {
     q.z = field.H(q.x, q.y);
     q.picked = world.picked.has(q.id);
   }
+  list.length = 0;
+  list.push(...keep);
   return { group: new THREE.Group(), list, dispose() {} };
 }
 
@@ -202,6 +221,15 @@ export class PropPool {
       const m = this.models[name];
       return m ? { name, m } : null;
     };
+    if (p.kind === 'bridge') {
+      // ponte esticada até as margens e girada na direção da travessia
+      const m = this.models && this.models.ponte;
+      if (!m) return;
+      const b = p.bridge, sc = b.length / m.size.x;
+      const ang = Math.atan2(-b.dy, b.dx);
+      out.push(['m:ponte', compose(b.x, b.deckZ - m.size.y * 0.5 * sc, b.y, ang, sc, sc)]);
+      return;
+    }
     if (p.kind === 'samauma') { push('samaumaTrunk', 0.85 + h * 0.3); push('samaumaCanopy', 0.85 + h * 0.3); return; }
     if (p.kind === 'acai') { const sy = 0.8 + h * 0.4; push('acaiTrunk', 1, sy); push('acaiCrown', 1, sy); push('acaiFruit', 1, sy); return; }
     // camu-camu com fruto usa o modelo com frutinhas; colhido, vira moita lisa até rebrotar

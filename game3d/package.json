@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "esbuild src/main.js --bundle --format=esm --sourcemap --outdir=www --servedir=www --serve=8090",
-    "build": "esbuild src/main.js --bundle --format=esm --minify --outfile=www/main.js"
+    "build": "esbuild src/main.js --bundle --format=esm --minify --outfile=www/main.js",
+    "page": "node tools/build-page.mjs"
   },
   "dependencies": {
     "three": "0.170.0",

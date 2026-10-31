@@ -10,6 +10,7 @@ import { DEFAULTS3D } from './field.js';
 import { PlayerMesh, CapybaraMesh } from './actors3d.js';
 import { toon } from './toon.js';
 import { loadModels } from './assets.js';
+import { GameMap } from './map3d.js';
 
 // Piloto 3D do Amazon Survival (Three.js). Reaproveita do 2D: gerador Perlin, esqueleto
 // com IK, lógica do jogador e da capivara, HUD. Coordenadas do jogo -> three: (x, z, y).
@@ -70,7 +71,8 @@ capy.z = world.groundZ(capy.x, capy.y);
 player.rig.groundRel = (x, y) => world.groundZ(x, y) - player.z;
 capy.rig.groundRel = (x, y) => world.groundZ(x, y) - capy.z;
 // modelos 3D carregam em segundo plano: o mundo abre na hora e eles aparecem ao chegar
-loadModels(window.__ASSET_BASE || '').then((m) => world.setModels(m)).catch((e) => console.warn('modelos não carregaram', e));
+loadModels(window.__ASSET_BASE || '').then((m) => { world.setModels(m); world.addShowcase(spawn[0], spawn[1], [0, 2, 3]); }).catch((e) => console.warn('modelos não carregaram', e));
+const gameMap = new GameMap(world);
 const playerMesh = new PlayerMesh(scene);
 const capyMesh = new CapybaraMesh(scene);
 const popups = new Popups();
@@ -90,11 +92,11 @@ const groups = [
   ['Terreno', [
     ['Ruído', [['frequency', 'frequência', 0.005, 0.15, 0.001], ['octaves', 'oitavas', 1, 8, 1], ['persistence', 'persistência', 0.1, 0.9, 0.01], ['lacunarity', 'lacunaridade', 1.2, 3.5, 0.05]]],
     ['Forma', [['maxHeight', 'altura máx.', 1, 20, 0.5], ['heightExponent', 'expoente', 0.4, 4, 0.05], ['waterLevel', 'nível da água', 0, 8, 0.1], ['heightScale', 'escala vertical', 0.3, 3, 0.05], ['terrace', 'degraus', 0, 1, 0.05], ['rockLine', 'linha da rocha', 0.2, 1, 0.01], ['maxSlope', 'subida máx.', 0.3, 3, 0.05]]],
-    ['Rios', [['riverScale', 'tamanho das curvas', 10, 160, 1], ['riverWidth', 'largura', 0, 0.2, 0.005]]],
+    ['Rios', [['riverScale', 'tamanho das curvas', 10, 160, 1], ['riverWidth', 'largura', 0, 0.2, 0.005], ['bridges', 'pontes (chance)', 0, 1, 0.05], ['bridgeSpan', 'vão máx. da ponte', 150, 900, 10]]],
   ]],
   ['Bioma', [
     ['Mata fechada', [['forestScale', 'tamanho', 4, 80, 1], ['forestAmount', 'quantidade', 0, 0.7, 0.01]]],
-    ['Objetos', [['samauma', 'samaúmas', 0, 0.03, 0.001], ['acai', 'açaizeiros', 0, 0.2, 0.005], ['bush', 'moitas', 0, 0.25, 0.005], ['camu', 'camu-camu', 0, 0.8, 0.01], ['rock', 'pedras', 0, 0.15, 0.005], ['forestTrees', 'árvores na mata', 0, 1, 0.05], ['deco', 'troncos e tocos', 0, 0.15, 0.005]]],
+    ['Objetos', [['samauma', 'samaúmas', 0, 0.03, 0.001], ['acai', 'açaizeiros', 0, 0.2, 0.005], ['bush', 'moitas', 0, 0.25, 0.005], ['camu', 'camu-camu', 0, 0.8, 0.01], ['rock', 'pedras', 0, 0.15, 0.005], ['forestTrees', 'árvores na mata', 0, 1, 0.05], ['deco', 'troncos e tocos', 0, 0.15, 0.005], ['build', 'construções', 0, 0.1, 0.002]]],
   ]],
 ];
 let rebuildTimer;
@@ -107,6 +109,7 @@ const rebuild = () => {
     if (!world.isFree(player.x, player.y, 14)) [player.x, player.y] = world.findSpawn(player.x, player.y);
     if (!world.isFree(capy.x, capy.y, 22)) [capy.x, capy.y] = world.findSpawn(player.x + 150, player.y + 150);
     capy.home = [capy.x, capy.y];
+    if (world.pool.models) world.addShowcase(player.x, player.y, [0, 2, 3]);
   }, 150);
 };
 for (const [title, subs] of groups) {
@@ -234,6 +237,7 @@ function update(dt) {
   water.position.set(Math.round(target.x / 500) * 500, 0, Math.round(target.z / 500) * 500);
   playerMesh.update(player);
   capyMesh.update(capy);
+  gameMap.update(dt, player);
 }
 
 function drawOverlay() {
@@ -269,4 +273,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__game = { world, player, capy, camera, renderer, scene, view, params, get fps() { return fps; } };
+window.__game = { gameMap, world, player, capy, camera, renderer, scene, view, params, get fps() { return fps; } };

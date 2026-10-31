@@ -2,6 +2,7 @@ import { Field, T } from './field.js';
 import { TerrainStreamer } from './terrain3d.js';
 import { PropPool } from './props3d.js';
 import { inflate } from './assets.js';
+import { Bridges } from './bridges3d.js';
 
 // Mundo 3D com a MESMA interface que o Player e a Capybara do 2D usam
 // (resolve, isFree, groundZ, findSpawn): a lógica deles roda aqui sem mudanças.
@@ -10,7 +11,9 @@ export class World3D {
     this.scene = scene;
     this.time = 0;
     this.picked = new Map();
+    this.extras = []; // objetos fora do gerador (ex.: vitrine perto do início)
     this.pool = new PropPool(scene);
+    this.bridges = new Bridges(this);
     this.streamer = new TerrainStreamer(scene, this);
     this.setParams(params);
   }
@@ -18,15 +21,18 @@ export class World3D {
   setParams(params) {
     this.field = new Field(params);
     this.params = this.field.p;
+    this.bridges.clear();
     this.streamer.clear();
   }
 
   // chão: sobre a água a superfície é 0 (o jogador não entra no fundo)
   groundZ(x, y) {
-    return Math.max(0, this.field.H(x, y));
+    const b = this.bridges.deckAt(x, y);
+    return b ? Math.max(b.deckZ, this.field.H(x, y)) : Math.max(0, this.field.H(x, y));
   }
 
   walkable(x, y) {
+    if (this.bridges.deckAt(x, y)) return true; // sobre a ponte dá para atravessar o rio
     const h = this.field.H(x, y);
     if (h < -6) return false; // água funda
     if (this.field.forest(x, y)) return false; // mata fechada
@@ -34,7 +40,9 @@ export class World3D {
   }
 
   colliders(x, y) {
-    return this.streamer.propsNear(x, y, 160).filter((p) => p.collider);
+    const near = this.streamer.propsNear(x, y, 160);
+    for (const p of this.extras) if (Math.abs(p.x - x) < 200 && Math.abs(p.y - y) < 200) near.push(p);
+    return near.filter((p) => p.collider);
   }
 
   resolve(e, rad, px, py) {
@@ -92,6 +100,12 @@ export class World3D {
     if (this.pool.dirty || !c0 || Math.hypot(x - c0[0], y - c0[1]) > 250) {
       const all = [];
       for (const c of this.streamer.chunks.values()) for (const p of c.props.list) all.push(p);
+      all.push(...this.extras);
+      // pontes dos chunks carregados
+      for (const c of this.streamer.chunks.values()) {
+        const b = this.bridges.forChunk(c.i, c.j);
+        if (b) all.push(b.prop || (b.prop = { id: b.id, kind: 'bridge', x: b.x, y: b.y, z: b.deckZ, bridge: b }));
+      }
       this.pool.rebuild(all, x, y);
     }
   }
@@ -109,6 +123,18 @@ export class World3D {
   pick(bush, regrow = 25) {
     this.picked.set(bush.id, this.time + regrow);
     bush.picked = true;
+    this.pool.dirty = true;
+  }
+
+  // vitrine: um de cada construção numa fileira à frente do ponto inicial
+  addShowcase(x, y, variants) {
+    this.extras = [];
+    variants.forEach((variant, k) => {
+      // em diagonal na tela (sudeste no mundo), afastados uns dos outros
+      let px = x + 260 + k * 230, py = y + 120 + k * 60;
+      [px, py] = this.findSpawn(px, py);
+      this.extras.push({ id: 'vitrine' + k, kind: 'build', x: px, y: py, z: this.field.H(px, py), variant, shadow: 40 });
+    });
     this.pool.dirty = true;
   }
 

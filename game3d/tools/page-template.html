@@ -1,0 +1,39 @@
+<title>Amazon Survival 3D</title>
+<meta charset="utf-8">
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Tela única de jogo 3D: um só tema, de propósito. */
+  :root { --bg: #aab98c; --ink: #1d1a12; --wood: #3a2a1c; --straw: #d9c08a; --text: #f4ead2; --warn: #e3743b; color-scheme: dark; }
+  html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); }
+  body { padding-left: max(0px, env(safe-area-inset-left, 0px)); padding-right: max(0px, env(safe-area-inset-right, 0px)); }
+  #app { position: fixed; inset: 0; }
+  #app canvas { display: block; width: 100%; height: 100%; }
+  #hud { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  #start { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(11,17,12,0.5); border: 0; color: var(--text); font: 600 18px/1.4 "Trebuchet MS", system-ui, sans-serif; cursor: pointer; padding: 16px; }
+  #start[hidden], #err[hidden] { display: none !important; }
+  #start span { background: var(--wood); border: 3px solid var(--ink); border-radius: 8px; padding: 14px 22px; text-align: center; }
+  #start small { display: block; color: var(--straw); font-size: 13px; margin-top: 4px; }
+  #start:focus-visible span { outline: 2px solid var(--straw); }
+  #err { position: fixed; left: 16px; right: 16px; top: 16px; z-index: 50; background: var(--wood); border: 3px solid var(--ink); border-radius: 8px; padding: 12px 14px; font: 13px/1.45 ui-monospace, Menlo, Consolas, monospace; color: var(--text); white-space: pre-wrap; max-height: 60vh; overflow: auto; }
+  #err b { color: var(--warn); font-family: "Trebuchet MS", system-ui, sans-serif; }
+</style>
+<div id="app"></div>
+<canvas id="hud"></canvas>
+<button id="start" type="button"><span>Piloto 3D — clique para jogar<small>WASD andar · Shift correr · Clique golpe · E interagir · roda do mouse zoom · M mapa · ` painel do mundo</small></span></button>
+<div id="err" hidden></div>
+<script>
+(function () {
+  var box = document.getElementById('err');
+  function show(msg) {
+    box.hidden = false;
+    box.innerHTML = '<b>O jogo encontrou um erro.</b> Copie este texto e mande para o Claude:\n\n';
+    box.appendChild(document.createTextNode(msg + '\n\nTela: ' + innerWidth + '×' + innerHeight + ' @' + devicePixelRatio + '\n' + navigator.userAgent));
+  }
+  addEventListener('error', function (e) { show(String(e.message || e.error) + (e.error && e.error.stack ? '\n' + e.error.stack : '')); });
+  addEventListener('unhandledrejection', function (e) { show(String(e.reason && (e.reason.stack || e.reason))); });
+  window.__showError = show;
+  try { var c = document.createElement('canvas'); if (!(c.getContext('webgl2') || c.getContext('webgl'))) show('Este navegador não liberou WebGL (aceleração gráfica). Ative a aceleração de hardware nas configurações do navegador.'); } catch (e) {}
+})();
+document.getElementById('start').addEventListener('click', function (e) { e.currentTarget.hidden = true; window.focus(); });
+</script>
+<!--GAME-->

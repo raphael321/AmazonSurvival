@@ -116,6 +116,7 @@ export class TerrainStreamer {
     const mesh = new THREE.Mesh(buildChunkGeometry(field, i * CHUNK, j * CHUNK), terrainMat);
     mesh.receiveShadow = true;
     group.add(mesh);
+    this.world.bridges.forChunk(i, j); // ponte do trecho de rio (entra no orçamento do chunk)
     const props = buildProps(this.world, i, j);
     group.add(props.group);
     this.scene.add(group);

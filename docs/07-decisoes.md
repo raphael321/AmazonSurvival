@@ -38,6 +38,10 @@ Formato: data · decisão · motivo · alternativas descartadas. Atualize sempre
 | 2026-10-31 | Modelos 3D do Raphael (Tripo) entram pelo pipeline de `docs/08-pipeline-de-modelos.md`: separar → simplificar → textura 2048 WebP → meshopt, + LOD; no jogo, material toon com a textura pintada e contorno | Original vinha numa malha só com textura 8K (~540 MB de VRAM); otimizado: ~1 MB e 26 objetos | Usar o arquivo como veio |
 | 2026-10-31 | Objetos instanciados em **pools globais** (um InstancedMesh por tipo), com distância de desenho por tamanho, LOD e sombra só em médios/grandes | De 2,56 M para ~430 mil triângulos por quadro (com sombra e terreno), ~80 draw calls | Um InstancedMesh por tipo por chunk |
 | 2026-10-31 | Samaúma e açaí seguem procedurais por enquanto, mas destoam dos modelos: pedir à Tripo modelos de samaúma, açaí, buriti e castanheira no mesmo estilo | Coerência visual | — |
+| 2026-10-31 | Construções do Raphael (bancada, ponte, paliçada com portão, sela) no pacote `construcoes.glb`: ~950 mil → ~7,5 mil triângulos cada (123 MB → 0,7 MB + LOD); vitrine perto do início e espalhadas para pré-visualização | Ver os modelos no mundo antes de virarem sistemas (crafting, base, montaria) | — |
+| 2026-10-31 | **Pontes procedurais sobre os rios**: por região de 2×2 chunks, a travessia mais curta de um rio de verdade (ruído de rio, não lagoa), com terra firme depois das margens; o modelo `ponte` é esticado e girado na travessia e o tabuleiro é andável; objetos não nascem na água nem no caminho da ponte | Pedido do Raphael: "nos rios ter pontes" | Ponte espalhada aleatória |
+| 2026-10-31 | **Mapa**: minimapa no canto e mapa grande (M) com relevo sombreado, água, mata, rocha, pontes marcadas e seta do jogador; relevo amostrado do campo de altura e refeito só quando o jogador se afasta; pontes buscadas aos poucos | Pedido: "marcar no mapa" | — |
+| 2026-10-31 | Build de página única reprodutível: `npm run page` (game3d/tools/build-page.mjs) embute os .glb em base64 | Publicar sem servidor (Artifact, itch.io) | Montar o HTML à mão |
 
 ## Dúvidas em aberto
 
