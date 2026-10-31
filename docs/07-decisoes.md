@@ -88,3 +88,8 @@ Formato: data · decisão · motivo · alternativas descartadas. Atualize sempre
 - Comportamento: Amazonssauro manso (anda, empina para comer, deita, se afasta do jogador); Pycnonemosaurus na mata e Oxalaia na margem/rio (nada): rugem antes de atacar (aviso justo), perseguem por pouco tempo e mordem (dano e empurrão). Sem vida, o jogador acorda no acampamento; a vida volta devagar.
 - População: um de cada perto do início; depois o jogo mantém até 3 amazonssauros, 1 pycno e 1 oxalaia em volta do jogador. Painel: "dinossauros" liga/desliga.
 - A cor da água agora fica salva junto com os outros ajustes (sem botão de salvar: tudo grava sozinho).
+
+## 2026-10-31 — Rios: azul alternando com barrento
+
+- Pedido do Raphael: em vez de água preta, os rios **alternam azul e barrento** por bacia (metade de cada; fronteira nítida onde se encontram). "rios barrentos" = 0 deixa tudo azul. Fica salvo sozinho.
+- Dinossauros procedurais não agradaram: o Raphael vai modelar (Tripo) a partir das vistas laterais em `refs/CRIATURAS/para-modelar/`. Os procedurais ficam até os modelos chegarem.

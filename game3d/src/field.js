@@ -16,7 +16,7 @@ export const DEFAULTS3D = {
   bridgeSpan: 520, // vão máximo de uma ponte
   cliffs: 0.5, // chance de penhasco/falésia em cada trecho de encosta íngreme
   forestAmount: 0.36, // terra firme: mata fechada cobre a maior parte (no 2D era 0.28)
-  blackWater: 0.45, // fração das bacias de água preta (tipo Rio Negro); o resto é água branca (barrenta)
+  blackWater: 0.5, // fração das bacias de água azul; o resto é barrenta (água branca, tipo Solimões)
 };
 
 const smooth = (a, b, x) => {
@@ -55,9 +55,8 @@ export class Field {
     return this.gen.forestAt(x / T, y / T) > this.gen.forestTh && this.H(x, y) < this.rockH;
   }
 
-  // 0 = água branca (barrenta, sedimento dos Andes, tipo Solimões), 1 = água preta
-  // (cor de chá, ácida, quase sem sedimento, tipo Rio Negro). Bacias grandes e misturas
-  // na confluência, como o Encontro das Águas.
+  // 0 = água branca (barrenta, sedimento dos Andes, tipo Solimões), 1 = rio azul.
+  // Bacias grandes, com fronteira nítida na confluência (como o Encontro das Águas).
   waterType(x, y) {
     const n = this.gen.forest.fbm(x / 64 / 140 + 311.7, y / 64 / 140 - 97.3, 2, 0.5);
     return smooth(-0.015, 0.015, n + (this.p.blackWater ?? 0.45) - 0.5);

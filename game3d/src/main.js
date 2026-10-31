@@ -108,7 +108,7 @@ const groups = [
   ['Terreno', [
     ['Ruído', [['frequency', 'frequência', 0.005, 0.15, 0.001], ['octaves', 'oitavas', 1, 8, 1], ['persistence', 'persistência', 0.1, 0.9, 0.01], ['lacunarity', 'lacunaridade', 1.2, 3.5, 0.05]]],
     ['Forma', [['maxHeight', 'altura máx.', 1, 20, 0.5], ['heightExponent', 'expoente', 0.4, 4, 0.05], ['waterLevel', 'nível da água', 0, 8, 0.1], ['heightScale', 'escala vertical', 0.3, 3, 0.05], ['terrace', 'degraus', 0, 1, 0.05], ['rockLine', 'linha da rocha', 0.2, 1, 0.01], ['maxSlope', 'subida máx.', 0.3, 3, 0.05]]],
-    ['Rios', [['riverScale', 'tamanho das curvas', 10, 160, 1], ['riverWidth', 'largura', 0, 0.2, 0.005], ['bridges', 'pontes (chance)', 0, 1, 0.05], ['bridgeSpan', 'vão máx. da ponte', 150, 900, 10], ['blackWater', 'água preta (fração)', 0, 1, 0.05]]],
+    ['Rios', [['riverScale', 'tamanho das curvas', 10, 160, 1], ['riverWidth', 'largura', 0, 0.2, 0.005], ['bridges', 'pontes (chance)', 0, 1, 0.05], ['bridgeSpan', 'vão máx. da ponte', 150, 900, 10], ['blackWater', 'rios azuis (fração)', 0, 1, 0.05]]],
   ]],
   ['Bioma', [
     ['Mata fechada', [['forestScale', 'tamanho', 4, 80, 1], ['forestAmount', 'quantidade', 0, 0.7, 0.01]]],
@@ -152,7 +152,7 @@ camF.addBinding(dinos, 'enabled', { label: 'dinossauros' });
 // cor da água fica salva junto com os outros ajustes (sem botão: grava sozinho ao mudar)
 if (params.aguaReal === undefined) params.aguaReal = 1;
 water.uniforms.uFiel.value = params.aguaReal;
-camF.addBinding(params, 'aguaReal', { label: 'água real (0 = azul)', min: 0, max: 1, step: 0.05 }).on('change', (e) => { water.uniforms.uFiel.value = e.value; saveParams(params); });
+camF.addBinding(params, 'aguaReal', { label: 'rios barrentos (0 = só azul)', min: 0, max: 1, step: 0.05 }).on('change', (e) => { water.uniforms.uFiel.value = e.value; saveParams(params); });
 camF.addBinding(view, 'fly', { label: 'modo voo' });
 camF.addBinding(view, 'shadows', { label: 'sombras' }).on('change', () => { sun.castShadow = view.shadows; });
 camF.addBinding(params, 'seed', { label: 'seed', min: 1, max: 99999, step: 1 }).on('change', rebuild);

@@ -31,8 +31,8 @@ uniform vec3 uOrigin; // x, z do canto e tamanho
 uniform vec3 uShallow;
 uniform vec3 uDeep;
 uniform vec3 uFoam;
-uniform vec3 uWhiteS, uWhiteD, uBlackS, uBlackD;
-uniform float uFiel; // 1 = cores reais dos rios amazônicos, 0 = azul estilizado
+uniform vec3 uWhiteS, uWhiteD;
+uniform float uFiel; // 1 = bacias barrentas e azuis alternadas, 0 = tudo azul
 varying vec2 vXZ;
 float ripples(vec2 p) {
   return wNoise(p * 0.012) * 0.6 + wNoise(p * 0.031 + 7.0) * 0.4;
@@ -54,12 +54,12 @@ void main() {
   float r = mix(r0, r1, mixk);
   float dk = smoothstep(0.02, 0.75, depth);
   float preta = inside ? m.a : 0.5;
-  // água branca: barrenta, opaca; água preta: chá escuro, âmbar no raso, quase preta no fundo
-  vec3 real = mix(mix(uWhiteS, uWhiteD, dk), mix(uBlackS, uBlackD, smoothstep(0.0, 0.45, depth)), preta);
+  // bacias alternam: rio barrento (água branca, opaca) e rio azul (estilizado, transparente)
+  vec3 real = mix(mix(uWhiteS, uWhiteD, dk), mix(uShallow, uDeep, dk), preta);
   vec3 col = mix(mix(uShallow, uDeep, dk), real, uFiel);
   // reflexo do céu (mais forte de longe): é o que separa a água barrenta do chão de terra
   float far = smoothstep(300.0, 2200.0, length(vXZ - cameraPosition.xz));
-  col = mix(col, vec3(0.80, 0.86, 0.86), uFiel * (0.12 + 0.3 * far));
+  col = mix(col, vec3(0.80, 0.86, 0.86), uFiel * (1.0 - preta) * (0.12 + 0.3 * far));
   // faixas de luz chapadas (toon) nas cristas das ondinhas
   col += vec3(0.07, 0.09, 0.1) * step(0.35, r);
   col -= vec3(0.03, 0.04, 0.04) * step(r, -0.4);
@@ -72,9 +72,9 @@ void main() {
   float foam = step(0.62, shore + 0.28 * fn);
   col = mix(col, uFoam, foam * 0.9);
   // transparente o bastante para ver os peixes logo abaixo da superfície
-  // a barrenta é turva (quase opaca); a preta é transparente e espelhada
+  // a barrenta é turva (quase opaca); a azul mantém a transparência de antes
   float alpha = mix(0.6, 0.84, smoothstep(0.0, 0.6, depth));
-  alpha = mix(alpha, mix(mix(0.78, 0.92, dk), mix(0.7, 0.9, dk), preta), uFiel);
+  alpha = mix(alpha, mix(mix(0.78, 0.92, dk), alpha, preta), uFiel);
   gl_FragColor = vec4(col, alpha);
   #include <fog_fragment>
 }`;
@@ -97,8 +97,6 @@ export class Water {
       uFoam: { value: new THREE.Color('#eef8f4') },
       uWhiteS: { value: new THREE.Color('#c9ad7e') },
       uWhiteD: { value: new THREE.Color('#a8875a') },
-      uBlackS: { value: new THREE.Color('#7a4a1e') },
-      uBlackD: { value: new THREE.Color('#1c130c') },
       uFiel: { value: 1 },
     };
     const mat = new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, uniforms: this.uniforms, fog: true, transparent: true, depthWrite: false });
