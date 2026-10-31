@@ -68,3 +68,10 @@ Formato: data · decisão · motivo · alternativas descartadas. Atualize sempre
 - Controle no celular: joystick virtual ou toque-para-andar.
 - Licença comercial dos modelos gerados na Tripo: confirmar no plano usado antes de vender na Steam.
 - Oxalaia é conhecido só por fragmentos do crânio e os tamanhos dos três dinossauros são estimativas: decidir quanto de "licença artística" aceitar e deixar isso claro no Diário do Naturalista.
+
+## 2026-10-31 — Kit de relevo (penhascos) da Tripo
+
+- Três modelos do Raphael: `penhasco_raizes` (pilar com raízes), `falesia` (morro escarpado em camadas) e `blocos_musgo` (conjunto de blocos). Pacote `game3d/www/assets/penhascos.glb` (+ LOD), ~33 mil triângulos, textura 1024 WebP.
+- A placa do "chão" que a Tripo põe embaixo é cortada no pipeline (`game3d/tools/trim-base.mjs`, triângulos abaixo de 1,5–2,2% da altura).
+- Posição: grade de 4 blocos; encosta com inclinação > 0,55 → penhasco/falésia (> 0,9) ou blocos; alto dos morros → chance menor. Assentado pelo ponto mais baixo da área ocupada (não flutua na encosta). Parâmetro `cliffs` no painel (Bioma → Objetos).
+- Colisão pela malha (MESH_PHYS); a câmera esconde o penhasco que fica entre ela e o jogador; o ponto inicial evita penhascos.

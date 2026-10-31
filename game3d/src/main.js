@@ -108,7 +108,7 @@ const groups = [
   ]],
   ['Bioma', [
     ['Mata fechada', [['forestScale', 'tamanho', 4, 80, 1], ['forestAmount', 'quantidade', 0, 0.7, 0.01]]],
-    ['Objetos', [['samauma', 'samaúmas', 0, 0.03, 0.001], ['acai', 'açaizeiros', 0, 0.2, 0.005], ['bush', 'moitas', 0, 0.25, 0.005], ['camu', 'camu-camu', 0, 0.8, 0.01], ['rock', 'pedras', 0, 0.15, 0.005], ['forestTrees', 'árvores na mata', 0, 1, 0.05], ['deco', 'troncos e tocos', 0, 0.15, 0.005], ['build', 'construções', 0, 0.1, 0.002]]],
+    ['Objetos', [['samauma', 'samaúmas', 0, 0.03, 0.001], ['acai', 'açaizeiros', 0, 0.2, 0.005], ['bush', 'moitas', 0, 0.25, 0.005], ['camu', 'camu-camu', 0, 0.8, 0.01], ['rock', 'pedras', 0, 0.15, 0.005], ['forestTrees', 'árvores na mata', 0, 1, 0.05], ['deco', 'troncos e tocos', 0, 0.15, 0.005], ['build', 'construções', 0, 0.1, 0.002], ['cliffs', 'penhascos', 0, 1, 0.05]]],
   ]],
 ];
 let rebuildTimer;
@@ -263,11 +263,11 @@ function update(dt) {
     const len = Math.hypot(bx - ax, by - ay) || 1;
     const hide = new Set();
     for (const p of world.streamer.propsNear((ax + bx) / 2, (ay + by) / 2, len / 2 + 120)) {
-      if (p.kind !== 'samauma' && p.kind !== 'acai' && p.kind !== 'forest') continue;
+      if (p.kind !== 'samauma' && p.kind !== 'acai' && p.kind !== 'forest' && p.kind !== 'cliff') continue;
       const u = Math.max(0, Math.min(1, ((p.x - ax) * (bx - ax) + (p.y - ay) * (by - ay)) / (len * len)));
       if (u > 0.92) continue; // atrás do personagem não atrapalha
       const dd = Math.hypot(p.x - (ax + (bx - ax) * u), p.y - (ay + (by - ay) * u));
-      if (dd < (p.kind === 'samauma' ? 150 : p.kind === 'forest' ? 70 : 30)) hide.add(p.id);
+      if (dd < (p.kind === 'samauma' ? 150 : p.kind === 'forest' ? 70 : p.kind === 'cliff' ? p.foot * 0.8 : 30)) hide.add(p.id);
     }
     world.pool.setHidden(hide);
   } else world.pool.setHidden(new Set());

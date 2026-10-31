@@ -111,7 +111,11 @@ const MODEL_SETS = {
   rock: ['pedra_capim', 'pedra_achatada', 'pedra_musgo', 'pedras_grupo', 'menir', 'pedra_musgo2'],
   build: ['bancada', 'ponte', 'portao', 'sela'],
   deco: ['tronco_caido', 'tronco_musgo', 'tronco', 'toco_raizes', 'toco_cortado', 'toco_a', 'toco_b', 'arco_raiz', 'ouricos_castanha'],
+  // kit de relevo (modelos do Raphael): ficam nas encostas íngremes e no alto dos morros
+  cliff: ['penhasco_raizes', 'falesia', 'blocos_musgo'],
 };
+// largura / altura de cada peça do relevo (para saber a área que ela ocupa no chão)
+const CLIFF_FOOT = { penhasco_raizes: 0.65, falesia: 0.75, blocos_musgo: 1.6 };
 const TARGET_H = {
   arvore_redonda: 540, arvore_raizes: 500, muda_folha: 150, muda_fina: 140, moita: 70, moita_folhas: 78, samambaia: 85,
   samambaia_fruto: 80, moita_flores: 55, cogumelos: 45, galho_cogumelo: 60, pedra_capim: 62, pedra_achatada: 45,
@@ -119,6 +123,7 @@ const TARGET_H = {
   toco_raizes: 58, toco_cortado: 46, toco_a: 40, toco_b: 44, arco_raiz: 85, ouricos_castanha: 30,
   // construções (modelos do Raphael)
   bancada: 82, ponte: 105, portao: 230, sela: 58,
+  penhasco_raizes: 300, falesia: 340, blocos_musgo: 120,
 };
 // distância máxima de desenho por tamanho (além disso a neblina já esconde)
 const FAR = { big: 3400, mid: 2200, small: 1400 };
@@ -126,7 +131,7 @@ const LOD_NEAR = 850; // além disso usa a versão de baixo detalhe
 const SIZE = (name) => (TARGET_H[name] || 0) >= 130 ? 'big' : (TARGET_H[name] || 0) >= 58 ? 'mid' : 'small';
 // objetos que colidem pela forma real da malha (física), e não por um círculo
 const MESH_PHYS = new Set(['bancada', 'portao', 'sela', 'tronco_caido', 'tronco_musgo', 'tronco', 'toco_raizes', 'toco_cortado', 'toco_a', 'toco_b', 'arco_raiz',
-  'pedra_capim', 'pedra_achatada', 'pedra_musgo', 'pedras_grupo', 'menir', 'pedra_musgo2']);
+  'pedra_capim', 'pedra_achatada', 'pedra_musgo', 'pedras_grupo', 'menir', 'pedra_musgo2', 'penhasco_raizes', 'falesia', 'blocos_musgo']);
 const SOLID = new Set(['bancada', 'portao', 'sela', 'tronco_caido', 'tronco_musgo', 'tronco', 'toco_raizes', 'toco_cortado', 'toco_a', 'toco_b', 'arco_raiz']);
 
 function hash2(i, j, s) {
@@ -160,12 +165,37 @@ export function buildProps(world, ci, cj) {
       const variant = [0, 2, 3][Math.floor(hash2(i, j, seed + 509) * 3)];
       list.push({ id: i + ',' + j + 'b', kind: 'build', x: px, y: py, variant, shadow: 40 });
     }
+  // relevo: penhascos e falésias nas encostas íngremes, blocos de pedra nas mais suaves
+  // e no alto dos morros. Grade larga (4 blocos) com sorteio, para formar maciços e não muros.
+  for (let y = 0; y < B; y += 4)
+    for (let x = 0; x < B; x += 4) {
+      const i = ci * B + x, j = cj * B + y;
+      const px = (i + 0.5 + hash2(i, j, seed + 601) * 3) * T, py = (j + 0.5 + hash2(i, j, seed + 607) * 3) * T;
+      const h = field.H(px, py), s = field.slope(px, py);
+      if (h < 8) continue;
+      const steep = s > 0.55, high = h > field.rockH * 0.75;
+      const chance = steep ? (p.cliffs ?? 0.5) : high ? (p.cliffs ?? 0.5) * 0.3 : 0;
+      if (hash2(i, j, seed + 613) >= chance) continue;
+      const r = hash2(i, j, seed + 617);
+      const variant = steep && s > 0.9 ? (r < 0.5 ? 0 : 1) : 2;
+      const name = MODEL_SETS.cliff[variant];
+      const size = 0.8 + hash2(i, j, seed + 619) * 0.5;
+      const foot = (TARGET_H[name] * CLIFF_FOOT[name] * size) / 2;
+      // assenta pelo ponto mais baixo da área: na encosta o lado de cima fica enterrado
+      // e o de baixo não flutua
+      let zMin = h;
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2;
+        zMin = Math.min(zMin, field.H(px + Math.cos(a) * foot * 0.75, py + Math.sin(a) * foot * 0.75));
+      }
+      list.push({ id: i + ',' + j + 'c', kind: 'cliff', x: px, y: py, zBase: zMin - TARGET_H[name] * size * 0.04, variant, size, foot, shadow: 0 });
+    }
   // nada nasce na água (o rio 3D é escavado depois da grade do gerador) nem sobre pontes
   // objetos com colisão também ficam longe do caminho da ponte (cabeceiras livres)
-  const keep = list.filter((q) => field.H(q.x, q.y) > 1.5 && world.bridges.distToDeck(q.x, q.y) > world.bridges.halfWidth + (q.collider || 0) + 8);
+  const keep = list.filter((q) => field.H(q.x, q.y) > 1.5 && world.bridges.distToDeck(q.x, q.y) > world.bridges.halfWidth + (q.collider || q.foot || 0) + 8);
   for (const q of keep) {
     if (q.kind === 'bush') q.collider = 0; // moitas, samambaias e flores: dá para atravessar
-    q.z = field.H(q.x, q.y);
+    q.z = q.zBase ?? field.H(q.x, q.y);
     q.picked = world.picked.has(q.id);
   }
   list.length = 0;
@@ -248,7 +278,7 @@ export class PropPool {
     // camu-camu com fruto usa o modelo com frutinhas; colhido, vira moita lisa até rebrotar
     const set = p.kind === 'bush' ? (p.fruit && !p.picked ? 'camu' : p.fruit ? 'colhido' : 'bush') : p.kind;
     const got = model(set);
-    const v = 0.85 + h * 0.3;
+    const v = (0.85 + h * 0.3) * (p.kind === 'cliff' ? p.size : 1);
     if (got) {
       push('m:' + got.name, got.m.scale * v);
       if (MESH_PHYS.has(got.name)) {

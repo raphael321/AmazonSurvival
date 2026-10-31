@@ -14,6 +14,7 @@ export const DEFAULTS3D = {
   build: 0.01, // construções espalhadas (pré-visualização)
   bridges: 0.75, // chance de ponte em cada trecho de rio (por chunk)
   bridgeSpan: 520, // vão máximo de uma ponte
+  cliffs: 0.5, // chance de penhasco/falésia em cada trecho de encosta íngreme
 };
 
 const smooth = (a, b, x) => {

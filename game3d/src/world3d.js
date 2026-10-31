@@ -103,7 +103,7 @@ export class World3D {
           if (Math.max(Math.abs(di), Math.abs(dj)) !== r) continue;
           const cx = (i0 + di + 0.5) * T, cy = (j0 + dj + 0.5) * T;
           // chão livre e plano, sem samaúma colada (a câmera em 3ª pessoa precisa de espaço)
-          if (this.isFree(cx, cy, 40) && this.field.slope(cx, cy) < 0.4 && !this.streamer.propsNear(cx, cy, 260).some((p) => p.kind === 'samauma' && Math.hypot(p.x - cx, p.y - cy) < 260)) return [cx, cy];
+          if (this.isFree(cx, cy, 40) && this.field.slope(cx, cy) < 0.4 && !this.streamer.propsNear(cx, cy, 400).some((p) => (p.kind === 'samauma' && Math.hypot(p.x - cx, p.y - cy) < 260) || (p.kind === 'cliff' && Math.hypot(p.x - cx, p.y - cy) < p.foot + 80))) return [cx, cy];
         }
     return [x, y];
   }
