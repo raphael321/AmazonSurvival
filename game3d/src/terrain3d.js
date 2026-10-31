@@ -120,6 +120,7 @@ export class TerrainStreamer {
     group.add(props.group);
     this.scene.add(group);
     this.chunks.set(this.key(i, j), { i, j, group, mesh, props });
+    this.world.pool.dirty = true;
   }
 
   dispose(k) {
@@ -129,6 +130,7 @@ export class TerrainStreamer {
     c.props.dispose();
     this.chunks.delete(k);
     this.stats.disposed++;
+    this.world.pool.dirty = true;
   }
 
   clear() {

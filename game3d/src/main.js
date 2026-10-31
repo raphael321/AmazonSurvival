@@ -9,6 +9,7 @@ import { World3D } from './world3d.js';
 import { DEFAULTS3D } from './field.js';
 import { PlayerMesh, CapybaraMesh } from './actors3d.js';
 import { toon } from './toon.js';
+import { loadModels } from './assets.js';
 
 // Piloto 3D do Amazon Survival (Three.js). Reaproveita do 2D: gerador Perlin, esqueleto
 // com IK, lógica do jogador e da capivara, HUD. Coordenadas do jogo -> three: (x, z, y).
@@ -68,6 +69,8 @@ capy.z = world.groundZ(capy.x, capy.y);
 // pés pisam no relevo de verdade (altura relativa à base do corpo)
 player.rig.groundRel = (x, y) => world.groundZ(x, y) - player.z;
 capy.rig.groundRel = (x, y) => world.groundZ(x, y) - capy.z;
+// modelos 3D carregam em segundo plano: o mundo abre na hora e eles aparecem ao chegar
+loadModels(window.__ASSET_BASE || '').then((m) => world.setModels(m)).catch((e) => console.warn('modelos não carregaram', e));
 const playerMesh = new PlayerMesh(scene);
 const capyMesh = new CapybaraMesh(scene);
 const popups = new Popups();
@@ -76,12 +79,13 @@ const view = { distance: 1150, pitch: 38, fly: false, shadows: true };
 // ---------- painel (Tweakpane) ----------
 const pane = new Pane({ title: 'Mundo (`)', expanded: true });
 pane.element.parentElement.style.zIndex = 30;
-const stats = { fps: 60, chunks: 0, fila: 0, msChunk: 0 };
+const stats = { fps: 60, chunks: 0, fila: 0, msChunk: 0, draws: 0 };
 const mon = pane.addFolder({ title: 'Monitor' });
 mon.addBinding(stats, 'fps', { readonly: true, view: 'graph', min: 0, max: 90 });
 mon.addBinding(stats, 'chunks', { readonly: true, format: (v) => v.toFixed(0) });
 mon.addBinding(stats, 'fila', { readonly: true, format: (v) => v.toFixed(0) });
 mon.addBinding(stats, 'msChunk', { readonly: true, label: 'ms/chunk', format: (v) => v.toFixed(1) });
+mon.addBinding(stats, 'draws', { readonly: true, label: 'draw calls', format: (v) => v.toFixed(0) });
 const groups = [
   ['Terreno', [
     ['Ruído', [['frequency', 'frequência', 0.005, 0.15, 0.001], ['octaves', 'oitavas', 1, 8, 1], ['persistence', 'persistência', 0.1, 0.9, 0.01], ['lacunarity', 'lacunaridade', 1.2, 3.5, 0.05]]],
@@ -90,7 +94,7 @@ const groups = [
   ]],
   ['Bioma', [
     ['Mata fechada', [['forestScale', 'tamanho', 4, 80, 1], ['forestAmount', 'quantidade', 0, 0.7, 0.01]]],
-    ['Objetos', [['samauma', 'samaúmas', 0, 0.03, 0.001], ['acai', 'açaizeiros', 0, 0.2, 0.005], ['bush', 'moitas', 0, 0.25, 0.005], ['camu', 'camu-camu', 0, 0.8, 0.01], ['rock', 'pedras', 0, 0.15, 0.005], ['forestTrees', 'árvores na mata', 0, 1, 0.05]]],
+    ['Objetos', [['samauma', 'samaúmas', 0, 0.03, 0.001], ['acai', 'açaizeiros', 0, 0.2, 0.005], ['bush', 'moitas', 0, 0.25, 0.005], ['camu', 'camu-camu', 0, 0.8, 0.01], ['rock', 'pedras', 0, 0.15, 0.005], ['forestTrees', 'árvores na mata', 0, 1, 0.05], ['deco', 'troncos e tocos', 0, 0.15, 0.005]]],
   ]],
 ];
 let rebuildTimer;
@@ -258,7 +262,7 @@ function frame(now) {
     renderer.render(scene, camera);
     drawOverlay();
     input.endFrame();
-    Object.assign(stats, { fps, chunks: world.streamer.chunks.size, fila: world.streamer.stats.queue, msChunk: world.streamer.stats.ms });
+    Object.assign(stats, { fps, chunks: world.streamer.chunks.size, fila: world.streamer.stats.queue, msChunk: world.streamer.stats.ms, draws: renderer.info.render.calls });
   } catch (err) {
     if (!reported) { reported = true; console.error(err); window.__showError?.(String(err.stack || err)); }
   }

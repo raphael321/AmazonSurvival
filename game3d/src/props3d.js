@@ -98,79 +98,182 @@ const MAT = () => ({
   stone: toon('#807b65'),
   darkBark: toon('#3c3524'),
   darkLeaf: toon('#2c4a30'),
-  shaft: toon('#2c5a3a'),
 });
 
-// Monta os objetos de um chunk a partir da lista do gerador.
-export function buildProps(world, ci, cj) {
-  const G = geometries(), M = MAT();
-  const list = world.field.gen.props(ci, cj).filter((p) => p.kind !== 'forest' || p.variant < 4);
-  const group = new THREE.Group();
-  const meshes = [];
-  const parts = {
-    samauma: [['samaumaTrunk', M.bark, true], ['samaumaCanopy', M.leaf, true]],
-    acai: [['acaiTrunk', M.bark, true], ['acaiCrown', M.frond, false], ['acaiFruit', M.acai, false]],
-    bush: [['bush', M.bushLeaf, true]],
-    rock: [['rock', M.stone, true]],
-    forest: [['forestTrunk', M.darkBark, false], ['forestCanopy', M.darkLeaf, true]],
-  };
-  const byKind = {};
-  for (const p of list) {
-    (byKind[p.kind] ||= []).push(p);
-    p.z = world.field.H(p.x, p.y);
-  }
-  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), v = new THREE.Vector3();
-  const up = new THREE.Vector3(0, 1, 0);
-  const matrixOf = (p) => {
-    const h = Math.sin(p.x * 0.13 + p.y * 0.07) * 0.5 + 0.5;
-    const sc = p.kind === 'rock' ? p.size || 1 : p.kind === 'bush' ? 0.85 + (p.variant % 3) * 0.15 : 0.85 + h * 0.3;
-    q.setFromAxisAngle(up, h * Math.PI * 2);
-    s.set(sc, p.kind === 'acai' ? 0.8 + h * 0.4 : sc, sc);
-    v.set(p.x, p.z - 4, p.y);
-    return m4.compose(v, q, s);
-  };
-  for (const [kind, items] of Object.entries(byKind)) {
-    for (const [geo, mat, ink] of parts[kind]) {
-      const mesh = new THREE.InstancedMesh(G[geo], mat, items.length);
-      items.forEach((p, k) => mesh.setMatrixAt(k, matrixOf(p)));
-      mesh.castShadow = kind !== 'bush';
-      mesh.receiveShadow = true;
-      group.add(mesh);
-      meshes.push(mesh);
-      if (ink) {
-        const o = new THREE.InstancedMesh(G.ink[geo], INK_MATERIAL, items.length);
-        o.instanceMatrix = mesh.instanceMatrix; // mesmas posições do objeto
-        group.add(o);
-        meshes.push(o);
-      }
-    }
-  }
-  // frutos do camu-camu: malha própria para poder esconder ao colher
-  const fruitBushes = (byKind.bush || []).filter((p) => p.fruit);
-  let fruitMesh = null;
-  if (fruitBushes.length) {
-    fruitMesh = new THREE.InstancedMesh(G.fruit, M.fruit, fruitBushes.length);
-    fruitBushes.forEach((p, k) => {
-      p.fruitIndex = k;
-      p.fruitMesh = fruitMesh;
-      fruitMesh.setMatrixAt(k, world.picked.has(p.id) ? new THREE.Matrix4().makeScale(0, 0, 0) : matrixOf(p));
-    });
-    group.add(fruitMesh);
-    meshes.push(fruitMesh);
-  }
-  for (const p of fruitBushes) p.matrix = matrixOf(p).clone();
-  return {
-    group,
-    list,
-    dispose() {
-      // geometrias são compartilhadas; só os buffers de instância morrem
-      for (const m of meshes) m.dispose();
-    },
-  };
+// Modelos da Tripo por categoria do gerador. Altura alvo em unidades do jogo (jogador ≈ 85).
+const MODEL_SETS = {
+  forest: ['arvore_redonda', 'arvore_raizes'],
+  bush: ['moita', 'samambaia', 'samambaia_fruto', 'moita_flores', 'cogumelos', 'muda_folha', 'muda_fina', 'galho_cogumelo'],
+  camu: ['moita_folhas'],
+  colhido: ['moita'],
+  rock: ['pedra_capim', 'pedra_achatada', 'pedra_musgo', 'pedras_grupo', 'menir', 'pedra_musgo2'],
+  deco: ['tronco_caido', 'tronco_musgo', 'tronco', 'toco_raizes', 'toco_cortado', 'toco_a', 'toco_b', 'arco_raiz', 'ouricos_castanha'],
+};
+const TARGET_H = {
+  arvore_redonda: 540, arvore_raizes: 500, muda_folha: 150, muda_fina: 140, moita: 70, moita_folhas: 78, samambaia: 85,
+  samambaia_fruto: 80, moita_flores: 55, cogumelos: 45, galho_cogumelo: 60, pedra_capim: 62, pedra_achatada: 45,
+  pedra_musgo: 60, pedras_grupo: 50, menir: 140, pedra_musgo2: 65, tronco_caido: 62, tronco_musgo: 56, tronco: 46,
+  toco_raizes: 58, toco_cortado: 46, toco_a: 40, toco_b: 44, arco_raiz: 85, ouricos_castanha: 30,
+};
+// distância máxima de desenho por tamanho (além disso a neblina já esconde)
+const FAR = { big: 3400, mid: 2200, small: 1400 };
+const LOD_NEAR = 850; // além disso usa a versão de baixo detalhe
+const SIZE = (name) => (TARGET_H[name] || 0) >= 130 ? 'big' : (TARGET_H[name] || 0) >= 58 ? 'mid' : 'small';
+const SOLID = new Set(['tronco_caido', 'tronco_musgo', 'tronco', 'toco_raizes', 'toco_cortado', 'toco_a', 'toco_b', 'arco_raiz']);
+
+function hash2(i, j, s) {
+  let h = Math.imul(i, 374761393) ^ Math.imul(j, 668265263) ^ Math.imul(s, 2147483647);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
-export function setFruitVisible(p, visible) {
-  if (!p.fruitMesh) return;
-  p.fruitMesh.setMatrixAt(p.fruitIndex, visible ? p.matrix : new THREE.Matrix4().makeScale(0, 0, 0));
-  p.fruitMesh.instanceMatrix.needsUpdate = true;
+// Lista de objetos de um chunk: os do gerador + decoração (troncos, tocos, ouriços).
+// A renderização fica com o PropPool (instâncias globais), aqui só dados.
+export function buildProps(world, ci, cj) {
+  const field = world.field, gen = field.gen, p = field.p;
+  const list = gen.props(ci, cj).filter((q) => q.kind !== 'forest' || q.variant < 4);
+  const T = 64, B = 16, seed = p.seed | 0;
+  for (let y = 0; y < B; y++)
+    for (let x = 0; x < B; x++) {
+      const i = ci * B + x, j = cj * B + y;
+      if (hash2(i, j, seed + 401) >= (p.deco ?? 0.02)) continue;
+      const px = (i + 0.3 + hash2(i, j, seed + 403) * 0.4) * T, py = (j + 0.3 + hash2(i, j, seed + 409) * 0.4) * T;
+      if (!world.walkable(px, py) || field.H(px, py) < 4) continue;
+      list.push({ id: i + ',' + j + 'd', kind: 'deco', x: px, y: py, variant: Math.floor(hash2(i, j, seed + 419) * 9), shadow: 24 });
+    }
+  for (const q of list) {
+    q.z = field.H(q.x, q.y);
+    q.picked = world.picked.has(q.id);
+  }
+  return { group: new THREE.Group(), list, dispose() {} };
+}
+
+// Pool global de instâncias: um InstancedMesh por tipo de objeto para o mundo todo
+// (≈ 60 chamadas de desenho em vez de uma por tipo por chunk).
+export class PropPool {
+  constructor(scene) {
+    this.scene = scene;
+    this.entries = new Map();
+    this.models = null;
+    this.dirty = true;
+    const G = geometries(), M = MAT();
+    const proc = (name, geo, mat, ink, cast = true) => this.define(name, G[geo], mat, ink ? G.ink[geo] : null, cast);
+    proc('samaumaTrunk', 'samaumaTrunk', M.bark, true);
+    proc('samaumaCanopy', 'samaumaCanopy', M.leaf, true);
+    proc('acaiTrunk', 'acaiTrunk', M.bark, true);
+    proc('acaiCrown', 'acaiCrown', M.frond, false);
+    proc('acaiFruit', 'acaiFruit', M.acai, false);
+    proc('bush', 'bush', M.bushLeaf, true, false);
+    proc('rock', 'rock', M.stone, true);
+    proc('forestTrunk', 'forestTrunk', M.darkBark, false);
+    proc('forestCanopy', 'forestCanopy', M.darkLeaf, true);
+    proc('fruit', 'fruit', M.fruit, false, false);
+  }
+
+  define(name, geo, mat, inkGeo, cast) {
+    this.entries.set(name, { name, geo, mat, inkGeo, cast, mesh: null, ink: null, cap: 0, mats: [] });
+  }
+
+  setModels(models, inflate) {
+    this.models = models;
+    for (const [name, m] of Object.entries(models)) {
+      const scale = (TARGET_H[name] || 60) / Math.max(0.001, m.size.y);
+      m.scale = scale;
+      // sombra só de objetos médios/grandes: os pequenos dobrariam o custo do passe de sombra à toa
+      this.define('m:' + name, m.geometry, m.material, inflate(m.geometry, 1.6 / scale), SIZE(name) !== 'small' && !name.startsWith('moita') && !name.startsWith('samambaia'));
+      this.entries.get('m:' + name).far = FAR[SIZE(name)];
+      if (m.lod) {
+        this.define('m:' + name + '@lod', m.lod.geometry, m.lod.material, inflate(m.lod.geometry, 1.6 / scale), false);
+        this.entries.get('m:' + name + '@lod').far = FAR[SIZE(name)];
+      }
+    }
+    this.dirty = true;
+  }
+
+  // escolhe as peças (tipo de render + matriz) de cada objeto
+  partsOf(p, out) {
+    const h = Math.sin(p.x * 0.13 + p.y * 0.07) * 0.5 + 0.5;
+    const rot = h * Math.PI * 2;
+    const push = (entry, sc, sy = sc) => out.push([entry, compose(p.x, p.z - 3, p.y, rot, sc, sy)]);
+    const model = (set) => {
+      if (!this.models) return null;
+      const names = MODEL_SETS[set];
+      const name = names[p.variant % names.length];
+      const m = this.models[name];
+      return m ? { name, m } : null;
+    };
+    if (p.kind === 'samauma') { push('samaumaTrunk', 0.85 + h * 0.3); push('samaumaCanopy', 0.85 + h * 0.3); return; }
+    if (p.kind === 'acai') { const sy = 0.8 + h * 0.4; push('acaiTrunk', 1, sy); push('acaiCrown', 1, sy); push('acaiFruit', 1, sy); return; }
+    // camu-camu com fruto usa o modelo com frutinhas; colhido, vira moita lisa até rebrotar
+    const set = p.kind === 'bush' ? (p.fruit && !p.picked ? 'camu' : p.fruit ? 'colhido' : 'bush') : p.kind;
+    const got = model(set);
+    const v = 0.85 + h * 0.3;
+    if (got) {
+      push('m:' + got.name, got.m.scale * v);
+      if (SOLID.has(got.name) && !p.collider) p.collider = Math.max(got.m.size.x, got.m.size.z) * got.m.scale * v * 0.35;
+    } else if (p.kind === 'samauma' || p.kind === 'forest') { push('forestTrunk', v); push('forestCanopy', v); }
+    else if (p.kind === 'bush') push('bush', 0.85 + (p.variant % 3) * 0.15);
+    else if (p.kind === 'rock') push('rock', p.size || 1);
+    // frutinhas procedurais só enquanto os modelos não chegaram
+    if (!got && p.kind === 'bush' && p.fruit && !p.picked) push('fruit', 0.85 + (p.variant % 3) * 0.15);
+  }
+
+  // refaz todas as instâncias a partir dos objetos carregados (só quando algo muda)
+  rebuild(allProps, cx, cy) {
+    const buckets = new Map();
+    const parts = [];
+    this.center = [cx, cy];
+    for (const p of allProps) {
+      const d = Math.hypot(p.x - cx, p.y - cy);
+      if (d > FAR.big) continue;
+      parts.length = 0;
+      this.partsOf(p, parts);
+      for (let [name, m] of parts) {
+        if (d > LOD_NEAR && this.entries.has(name + '@lod')) name += '@lod';
+        const far = this.entries.get(name).far || (name === 'bush' || name === 'fruit' ? FAR.small : FAR.big);
+        if (d > far) continue;
+        if (!buckets.has(name)) buckets.set(name, []);
+        buckets.get(name).push(m);
+      }
+    }
+    for (const e of this.entries.values()) {
+      const list = buckets.get(e.name) || [];
+      if (list.length > e.cap) this.grow(e, Math.max(64, Math.ceil(list.length * 1.5)));
+      if (!e.mesh) continue;
+      list.forEach((m, k) => e.mesh.setMatrixAt(k, m));
+      e.mesh.count = list.length;
+      e.mesh.instanceMatrix.needsUpdate = true;
+      if (e.ink) e.ink.count = list.length;
+    }
+    this.dirty = false;
+  }
+
+  grow(e, cap) {
+    if (e.mesh) { this.scene.remove(e.mesh); e.mesh.dispose(); }
+    if (e.ink) { this.scene.remove(e.ink); }
+    e.mesh = new THREE.InstancedMesh(e.geo, e.mat, cap);
+    e.mesh.frustumCulled = false; // instâncias espalhadas pela área carregada
+    e.mesh.castShadow = e.cast;
+    e.mesh.receiveShadow = true;
+    this.scene.add(e.mesh);
+    if (e.inkGeo) {
+      e.ink = new THREE.InstancedMesh(e.inkGeo, INK_MATERIAL, cap);
+      e.ink.instanceMatrix = e.mesh.instanceMatrix; // mesmas posições do objeto
+      e.ink.frustumCulled = false;
+      this.scene.add(e.ink);
+    }
+    e.cap = cap;
+  }
+
+  get drawCalls() {
+    let n = 0;
+    for (const e of this.entries.values()) if (e.mesh && e.mesh.count) n += e.ink ? 2 : 1;
+    return n;
+  }
+}
+
+const _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
+function compose(x, y, z, rot, sc, sy) {
+  _q.setFromAxisAngle(_up, rot);
+  return new THREE.Matrix4().compose(_v.set(x, y, z), _q, _s.set(sc, sy, sc));
 }

@@ -30,7 +30,7 @@ export const DEFAULTS = {
   // objetos
   acai: 0.02,
   bush: 0.025,
-  camu: 0.3,
+  camu: 0.15,
   rock: 0.012,
   samauma: 0.0015,
   forestTrees: 0.4,

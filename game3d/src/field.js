@@ -10,6 +10,7 @@ export const DEFAULTS3D = {
   heightScale: 1, // multiplica a altura (1 nível = 30 unidades)
   terrace: 0, // 0 = encosta suave, 1 = degraus de bloco (estilo 2D)
   maxSlope: 1.1, // inclinação máxima que dá para subir (tangente)
+  deco: 0.02, // troncos, tocos, ouriços de castanha
 };
 
 const smooth = (a, b, x) => {

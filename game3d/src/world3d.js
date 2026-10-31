@@ -1,6 +1,7 @@
 import { Field, T } from './field.js';
 import { TerrainStreamer } from './terrain3d.js';
-import { setFruitVisible } from './props3d.js';
+import { PropPool } from './props3d.js';
+import { inflate } from './assets.js';
 
 // Mundo 3D com a MESMA interface que o Player e a Capybara do 2D usam
 // (resolve, isFree, groundZ, findSpawn): a lógica deles roda aqui sem mudanças.
@@ -9,6 +10,7 @@ export class World3D {
     this.scene = scene;
     this.time = 0;
     this.picked = new Map();
+    this.pool = new PropPool(scene);
     this.streamer = new TerrainStreamer(scene, this);
     this.setParams(params);
   }
@@ -71,14 +73,26 @@ export class World3D {
     return [x, y];
   }
 
+  setModels(models) {
+    this.pool.setModels(models, inflate);
+  }
+
   update(dt, x, y) {
     this.time += dt;
     this.streamer.update(x, y);
+    // camu-camu volta a dar fruto
     for (const [id, t] of this.picked) {
       if (t > this.time) continue;
       this.picked.delete(id);
       const p = this.streamer.propsNear(x, y, 4000).find((q) => q.id === id);
-      if (p) setFruitVisible(p, true);
+      if (p) { p.picked = false; this.pool.dirty = true; }
+    }
+    // instâncias refeitas quando chunks mudam ou o jogador anda um pouco (distância de desenho)
+    const c0 = this.pool.center;
+    if (this.pool.dirty || !c0 || Math.hypot(x - c0[0], y - c0[1]) > 250) {
+      const all = [];
+      for (const c of this.streamer.chunks.values()) for (const p of c.props.list) all.push(p);
+      this.pool.rebuild(all, x, y);
     }
   }
 
@@ -94,7 +108,8 @@ export class World3D {
 
   pick(bush, regrow = 25) {
     this.picked.set(bush.id, this.time + regrow);
-    setFruitVisible(bush, false);
+    bush.picked = true;
+    this.pool.dirty = true;
   }
 
   strike() {}

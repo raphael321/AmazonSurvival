@@ -35,6 +35,9 @@ Formato: data · decisão · motivo · alternativas descartadas. Atualize sempre
 | 2026-10-31 | Steam: empacotar o mesmo build web com **Electron** (ou Tauri) + **steamworks.js** (conquistas, nuvem) | Um código só para navegador e desktop | Reescrever em engine nativa |
 | 2026-10-31 | Bibliotecas: three, tweakpane, esbuild (build). Depois, sob demanda: gltf-transform (comprimir modelos), postprocessing (contorno/bloom/raios), three-mesh-bvh (colisão em modelos), Rapier (física), Colyseus/ws (multiplayer). Sem React Three Fiber por enquanto | Leves e focadas; cada uma entra só quando o jogo pedir | Engine/framework completo agora |
 | 2026-10-31 | **O jogo será em 3D (Three.js).** `game3d/` passa a ser o jogo principal; `game/` (2D) fica como referência e fonte dos módulos compartilhados (gerador, esqueleto, entidades) até a migração completa | Raphael aprovou o piloto 3D: "bem melhor em 3D, será assim" | Seguir no Canvas 2D |
+| 2026-10-31 | Modelos 3D do Raphael (Tripo) entram pelo pipeline de `docs/08-pipeline-de-modelos.md`: separar → simplificar → textura 2048 WebP → meshopt, + LOD; no jogo, material toon com a textura pintada e contorno | Original vinha numa malha só com textura 8K (~540 MB de VRAM); otimizado: ~1 MB e 26 objetos | Usar o arquivo como veio |
+| 2026-10-31 | Objetos instanciados em **pools globais** (um InstancedMesh por tipo), com distância de desenho por tamanho, LOD e sombra só em médios/grandes | De 2,56 M para ~430 mil triângulos por quadro (com sombra e terreno), ~80 draw calls | Um InstancedMesh por tipo por chunk |
+| 2026-10-31 | Samaúma e açaí seguem procedurais por enquanto, mas destoam dos modelos: pedir à Tripo modelos de samaúma, açaí, buriti e castanheira no mesmo estilo | Coerência visual | — |
 
 ## Dúvidas em aberto
 
@@ -42,4 +45,5 @@ Formato: data · decisão · motivo · alternativas descartadas. Atualize sempre
 - Single player com save local no MVP: ok? (proposto: sim)
 - Representação de povos indígenas: incluir ou não, e com qual consultoria.
 - Controle no celular: joystick virtual ou toque-para-andar.
+- Licença comercial dos modelos gerados na Tripo: confirmar no plano usado antes de vender na Steam.
 - Oxalaia é conhecido só por fragmentos do crânio e os tamanhos dos três dinossauros são estimativas: decidir quanto de "licença artística" aceitar e deixar isso claro no Diário do Naturalista.
