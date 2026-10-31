@@ -233,6 +233,7 @@ export class PropPool {
   setModels(models, inflate) {
     this.models = models;
     for (const [name, m] of Object.entries(models)) {
+      if (name.startsWith('dino_')) continue; // animais: desenhados por dinos.js
       const scale = (TARGET_H[name] || 60) / Math.max(0.001, m.size.y);
       m.scale = scale;
       // sombra só de objetos médios/grandes: os pequenos dobrariam o custo do passe de sombra à toa

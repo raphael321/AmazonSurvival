@@ -93,3 +93,10 @@ Formato: data · decisão · motivo · alternativas descartadas. Atualize sempre
 
 - Pedido do Raphael: em vez de água preta, os rios **alternam azul e barrento** por bacia (metade de cada; fronteira nítida onde se encontram). "rios barrentos" = 0 deixa tudo azul. Fica salvo sozinho.
 - Dinossauros procedurais não agradaram: o Raphael vai modelar (Tripo) a partir das vistas laterais em `refs/CRIATURAS/para-modelar/`. Os procedurais ficam até os modelos chegarem.
+
+## 2026-10-31 — Dinossauros com os modelos do Raphael
+
+- Modelos da Tripo (Pycnonemosaurus, Oxalaia, Amazonssauro) em `game3d/www/assets/dinos.glb` (~10 mil triângulos cada, textura 1024). O Amazonssauro foi girado 90° no pipeline (`trim-base.mjs` ganhou o parâmetro de giro) para todos terem a cabeça em +X.
+- Sem esqueleto: **animação no shader de vértice**. O jogo mede no modelo os pés, o quadril, a barriga, a cauda e o pescoço; cada perna gira em volta do quadril (passo alternado e pé levantando), a cauda ondula e curva nas viradas, o pescoço ergue no rugido / abaixa para pastar, e deitado as pernas encolhem. O corpo inclina com o terreno (limitado a ±17°). Os procedurais continuam como reserva enquanto os modelos carregam.
+- Comprimento no jogo: Pycnonemosaurus 430, Oxalaia 560, Amazonssauro 600 unidades (~9, 12 e 12,5 m).
+- Regra do Raphael: **carnívoros atacam** quem chega perto (com rugido de aviso); **herbívoros só atacam se forem atacados** (golpe de facão deixa o bicho furioso por 25 s). Saurópode revida pisoteando.

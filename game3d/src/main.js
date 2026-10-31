@@ -77,7 +77,7 @@ capy.height = 52;
 player.swimDepth = -50; // nadando: água no peito
 capy.swimDepth = -22; // capivara nada com o lombo de fora
 // modelos 3D carregam em segundo plano: o mundo abre na hora e eles aparecem ao chegar
-loadModels(window.__ASSET_BASE || '').then((m) => { world.setModels(m); world.addShowcase(spawn[0], spawn[1], [0, 2, 3]); }).catch((e) => console.warn('modelos não carregaram', e));
+loadModels(window.__ASSET_BASE || '').then((m) => { world.setModels(m); dinos.models = m; world.addShowcase(spawn[0], spawn[1], [0, 2, 3]); }).catch((e) => console.warn('modelos não carregaram', e));
 const gameMap = new GameMap(world);
 // clima: água com rio correndo, gramado em volta do personagem, traços de vento e fogueira
 const water = new Water(scene, world);
@@ -199,6 +199,19 @@ function aimAtMouse() {
 
 function onStrike(p) {
   const fx = Math.cos(p.angle), fy = Math.sin(p.angle);
+  // golpe acerta o dinossauro que está à frente (perto do corpo, do quadril à boca)
+  for (const d of dinos.list) {
+    if (!d.pelvis || !d.mouth) continue;
+    const ax = d.pelvis[0], ay = d.pelvis[1], bx = d.mouth[0], by = d.mouth[1];
+    const t = Math.max(0, Math.min(1, ((p.x - ax) * (bx - ax) + (p.y - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2 || 1)));
+    const cx = ax + (bx - ax) * t, cy = ay + (by - ay) * t, dd = Math.hypot(cx - p.x, cy - p.y);
+    if (dd < (d.bodyR || 40) + 70 && ((cx - p.x) * fx + (cy - p.y) * fy) / (dd || 1) > 0.1) {
+      const calm = !d.sp.aggressive && !(d.angry > 0);
+      d.provoke();
+      const [x, y] = toScreen(cx, cy, p.z + 120);
+      popups.add(x, y, calm ? `${d.sp.nome} ficou furioso!` : 'Golpe!', { color: '#e2553d' });
+    }
+  }
   const dx = capy.x - p.x, dy = capy.y - p.y, d = Math.hypot(dx, dy);
   if (d < 75 && (dx * fx + dy * fy) / (d || 1) > 0.2) {
     capy.hitBy(p);
@@ -282,7 +295,7 @@ function update(dt) {
   else if (world.nearestFruitBush(player.x, player.y, 80)) hint = 'E — colher camu-camu';
   else {
     const d = dinos.nearest(player.x, player.y, 700);
-    if (d) hint = d.sp.aggressive ? `${d.sp.nome} — cuidado! ${d.state === 'chase' ? 'Corra!' : 'Fique longe.'}` : `${d.sp.nome} — manso. Não chegue muito perto.`;
+    if (d) hint = d.state === 'chase' ? `${d.sp.nome} está atacando — corra!` : d.sp.aggressive ? `${d.sp.nome} — carnívoro, fique longe.` : d.angry > 0 ? `${d.sp.nome} está furioso!` : `${d.sp.nome} — herbívoro, só ataca se for atacado.`;
   }
 
   // câmera 3/4 a 45° (sudeste olhando para noroeste), segue suave

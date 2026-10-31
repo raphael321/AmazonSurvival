@@ -1,13 +1,19 @@
 // Prepara um modelo de UMA peça da Tripo: corta a placa fina do "chão" que vem embaixo
 // (triângulos inteiros abaixo de CUT × altura), põe a base em y=0, centraliza em x/z
-// e dá nome ao nó. Uso: node trim-base.mjs entrada.glb saida.glb nome [cut=0.015]
+// e dá nome ao nó. Uso: node trim-base.mjs entrada.glb saida.glb nome [cut=0.015] [giroY°]
+// giroY: gira em volta do eixo vertical antes (ex.: 90 põe a cabeça que olha para +Z em +X)
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-const [, , input, output, name, cutArg] = process.argv;
+const [, , input, output, name, cutArg, rotArg] = process.argv;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
 const doc = await io.read(input);
 const prim = doc.getRoot().listMeshes()[0].listPrimitives()[0];
 const P = prim.getAttribute('POSITION').getArray(), idx = prim.getIndices().getArray();
+const rot = (Number(rotArg || 0) * Math.PI) / 180;
+if (rot) {
+  const c = Math.cos(rot), s = Math.sin(rot), N = prim.getAttribute('NORMAL')?.getArray();
+  for (const A of [P, N]) if (A) for (let i = 0; i < A.length; i += 3) { const x = A[i], z = A[i + 2]; A[i] = x * c + z * s; A[i + 2] = -x * s + z * c; }
+}
 let y0 = Infinity, y1 = -Infinity;
 for (let i = 1; i < P.length; i += 3) { y0 = Math.min(y0, P[i]); y1 = Math.max(y1, P[i]); }
 const cut = y0 + (y1 - y0) * Number(cutArg ?? 0.015);

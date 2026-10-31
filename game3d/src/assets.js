@@ -5,7 +5,7 @@ import { toonRamp } from './toon.js';
 
 // Carrega os pacotes de objetos (já separados e comprimidos com meshopt + WebP) e devolve
 // { nome: { geometry, material, inkGeometry, size } } com material toon (textura pintada + 3 tons).
-export const MODEL_FILES = ['assets/floresta-1.glb', 'assets/floresta-2.glb', 'assets/construcoes.glb', 'assets/penhascos.glb'];
+export const MODEL_FILES = ['assets/floresta-1.glb', 'assets/floresta-2.glb', 'assets/construcoes.glb', 'assets/penhascos.glb', 'assets/dinos.glb'];
 // versões de baixo detalhe (LOD), geradas offline com gltf-transform simplify
 export const LOD_FILES = ['assets/floresta-1-lod.glb', 'assets/floresta-2-lod.glb', 'assets/construcoes-lod.glb', 'assets/penhascos-lod.glb'];
 
