@@ -9,6 +9,7 @@ import { World3D } from './world3d.js';
 import { DEFAULTS3D } from './field.js';
 import { PlayerMesh, CapybaraMesh } from './actors3d.js';
 import { Dinos } from './dinos.js';
+import { loadRigs } from './rigs.js';
 import { loadModels } from './assets.js';
 import { GameMap } from './map3d.js';
 import { updateWind, windSettings } from './wind.js';
@@ -92,6 +93,8 @@ const popups = new Popups();
 // dinossauros (Ecos do Cretáceo): um de cada perto do começo, depois a população se mantém em volta
 const dinos = new Dinos(scene, world);
 dinos.showcase(spawn[0], spawn[1]);
+// animais com esqueleto (onça, amazonssauro): trocam o corpo assim que o arquivo chega
+loadRigs(window.__ASSET_BASE || '').then((r) => { dinos.rigs = r; });
 const view = { distance: 1150, pitch: 38, fly: false, shadows: true };
 
 // ---------- painel (Tweakpane) ----------

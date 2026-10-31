@@ -100,3 +100,11 @@ Formato: data · decisão · motivo · alternativas descartadas. Atualize sempre
 - Sem esqueleto: **animação no shader de vértice**. O jogo mede no modelo os pés, o quadril, a barriga, a cauda e o pescoço; cada perna gira em volta do quadril (passo alternado e pé levantando), a cauda ondula e curva nas viradas, o pescoço ergue no rugido / abaixa para pastar, e deitado as pernas encolhem. O corpo inclina com o terreno (limitado a ±17°). Os procedurais continuam como reserva enquanto os modelos carregam.
 - Comprimento no jogo: Pycnonemosaurus 430, Oxalaia 560, Amazonssauro 600 unidades (~9, 12 e 12,5 m).
 - Regra do Raphael: **carnívoros atacam** quem chega perto (com rugido de aviso); **herbívoros só atacam se forem atacados** (golpe de facão deixa o bicho furioso por 25 s). Saurópode revida pisoteando.
+
+## 2026-10-31 — Animais com esqueleto (auto-rig da Tripo)
+
+- Fluxo: no Tripo, **3D Rigging → Other** (não Humanoid) → escolher animações → exportar GLB com esqueleto. Conferimos o arquivo antes (ossos, pesos, animações).
+- `game3d/src/rigs.js` (`RigBody`): toca as animações prontas (ex.: `preset:quadruped:walk` da onça) no ritmo da velocidade; sem animação (Amazonssauro), os ossos são movidos por código (coxa balança, joelho dobra no balanço). Camada procedural por cima: cauda em onda e curva na virada, pescoço olha/ergue/abaixa, deitar dobra as patas. Os nomes dos ossos chegam sem `::` (`tripoSpine_0`).
+- Ordem de corpo: rigado > modelo animado no shader > procedural.
+- Onça-pintada entra como carnívora (ataca), na mata, ~2,4 m.
+- Correções: bípedes com tronco inclinado na pose do modelo são nivelados (excesso de inclinação desfeito, pernas compensadas); inclinação no terreno limitada (±7° bípedes, ±14° quadrúpedes); rugido ergue menos a cabeça. Animais colidem entre si e com troncos e penhascos.

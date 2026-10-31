@@ -1,3 +1,4 @@
+import { RigBody } from './rigs.js';
 import * as THREE from 'three';
 import { toonRamp, INK_MATERIAL } from './toon.js';
 
@@ -31,6 +32,11 @@ function ik2(A, T, l1, l2, pole) {
 
 // ---------- espécies (proporções tiradas das fichas em refs/CRIATURAS) ----------
 export const SPECIES = {
+  // onça-pintada: só existe com o modelo rigado (rig-onca.glb); ~2,4 m com a cauda
+  onca: {
+    nome: 'Onça-pintada', biped: false, rig: 'onca', rigOnly: true, length: 120, walk: 85, run: 420, freq: 1.1, aggressive: true, habitat: 'mata', bite: 15,
+    hip: 40, torso: 60, bodyW: 16, bodyH: 20, cor: {},
+  },
   pycno: {
     nome: 'Pycnonemosaurus', biped: true, hip: 128, hipW: 26, torso: 150, bodyW: 40, bodyH: 52, chestR: 36,
     neck: [[46, 0.55], [40, 0.35]], neckR: 24, head: { len: 72, h: 34, w: 24, snout: 0.9, jaw: 0.55 },
@@ -50,7 +56,7 @@ export const SPECIES = {
     nome: 'Amazonssauro', biped: false, hip: 150, hipW: 34, torso: 190, bodyW: 56, bodyH: 62, chestR: 48, shoulder: 0.94,
     neck: [[48, 0.95], [46, 0.85], [44, 0.75], [42, 0.62], [40, 0.45], [36, 0.25]], neckR: 22, head: { len: 46, h: 22, w: 18, snout: 0.7, jaw: 0.2 },
     tail: { n: 11, len: 380, r: 40 }, leg: [86, 76, 22], legR: 22, front: [78, 66, 18], frontR: 19,
-    walk: 55, run: 130, freq: 0.7, aggressive: false, habitat: 'aberto', herd: 2, bite: 18, model: 'dino_amazon', length: 600,
+    walk: 55, run: 130, freq: 0.7, aggressive: false, habitat: 'aberto', herd: 2, bite: 18, model: 'dino_amazon', length: 600, rig: 'amazon', grazer: true,
     cor: { costas: '#7c6748', claro: '#a99272', barriga: '#c1ab88', escuro: '#5b4932', destaque: '#6c573b', olho: '#1d1a12' },
   },
 };
@@ -197,7 +203,7 @@ export class Dino {
         if (this.timer <= 0) {
           const r = Math.random();
           if (r < 0.15) this.setState('rest', 8 + Math.random() * 10);
-          else if (!sp.biped && r < 0.4) this.setState('eat', 4 + Math.random() * 3);
+          else if (sp.grazer && r < 0.4) this.setState('eat', 4 + Math.random() * 3);
           else { this.target = this.pickTarget(world); this.setState(this.target ? 'walk' : 'idle', 12); }
         }
         break;
@@ -460,6 +466,7 @@ export class Dinos {
     this.crew = new Crew(scene);
     this.scene = scene;
     this.models = null;
+    this.rigs = null;
     this.list = [];
     this.enabled = true;
   }
@@ -478,7 +485,7 @@ export class Dinos {
         continue;
       }
       if (h < 10) continue;
-      if (kind === 'pycno' && !f.forest(x, y) && k < 300) continue;
+      if ((kind === 'pycno' || kind === 'onca') && !f.forest(x, y) && k < 300) continue;
       if (kind === 'amazon' && f.forest(x, y) && k < 300) continue;
       return [x, y];
     }
@@ -494,7 +501,7 @@ export class Dinos {
   // um de cada perto do começo, para ver logo
   showcase(px, py) {
     const out = [];
-    for (const [kind, r0, r1] of [['amazon', 650, 1000], ['pycno', 900, 1300], ['oxalaia', 600, 1800]]) {
+    for (const [kind, r0, r1] of [['amazon', 650, 1000], ['pycno', 900, 1300], ['oxalaia', 600, 1800], ['onca', 500, 800]]) {
       const s = this.spotFor(kind, px, py, r0, r1);
       if (!s) continue;
       out.push(this.spawn(kind, s[0], s[1]));
@@ -511,7 +518,7 @@ export class Dinos {
       if (!keep && d.body) d.body.dispose();
       return keep;
     });
-    const want = { amazon: 3, pycno: 1, oxalaia: 1 };
+    const want = { amazon: 3, pycno: 1, oxalaia: 1, onca: this.rigs && this.rigs.onca ? 1 : 0 };
     for (const d of this.list) want[d.kind]--;
     for (const kind of Object.keys(want)) if (want[kind] > 0 && Math.random() < dt * 0.3) {
       const s = this.spotFor(kind, player.x, player.y, 2600, 4200);
@@ -522,10 +529,13 @@ export class Dinos {
       const dist = Math.hypot(d.x - player.x, d.y - player.y);
       d.update(dt, this.world, player);
       if (d.bit) { d.bit = false; events.push({ type: 'mordida', dino: d }); }
+      // melhor corpo disponível: rigado (ossos) > modelo animado no shader > procedural
+      const rig = this.rigs && d.sp.rig && this.rigs[d.sp.rig];
+      if (rig && !(d.body instanceof RigBody)) { if (d.body) d.body.dispose(); d.body = new RigBody(this.scene, rig, d.sp); }
       const model = this.models && this.models[d.sp.model];
       if (model && !d.body) d.body = new ModelBody(this.scene, model, d.sp);
-      if (d.body) d.body.update(d, this.world, dist < 4200);
-      else if (dist < 4200) d.draw(this.crew, this.world);
+      if (d.body) d.body.update(d, this.world, dist < 4200, dt);
+      else if (dist < 4200 && !d.sp.rigOnly) d.draw(this.crew, this.world);
       // o corpo empurra o jogador (quadril e peito)
       if (d.pelvis && dist < 600) for (const c of [d.pelvis, d.chest]) {
         const r = (d.bodyR || d.sp.bodyW * d.scale) + 26;
@@ -534,6 +544,42 @@ export class Dinos {
       }
     }
     this.crew.end();
+    this.separate(dt);
+  }
+
+  // ninguém atravessa ninguém: animais entre si (círculos no quadril e no peito) e contra
+  // troncos de árvore e penhascos (círculos do mundo)
+  separate() {
+    const L = this.list, w = this.world;
+    const pts = (d) => {
+      const r = (d.bodyR || 30) * 1.15;
+      return d.pelvis && d.chest ? [[d.pelvis[0], d.pelvis[1], r], [d.chest[0], d.chest[1], r]] : [[d.x, d.y, r]];
+    };
+    for (let i = 0; i < L.length; i++)
+      for (let j = i + 1; j < L.length; j++) {
+        const a = L[i], b = L[j];
+        if (Math.abs(a.x - b.x) > 900 || Math.abs(a.y - b.y) > 900) continue;
+        for (const [ax, ay, ar] of pts(a)) for (const [bx, by, br] of pts(b)) {
+          const dx = bx - ax, dy = by - ay, d = Math.hypot(dx, dy), m = ar + br;
+          if (d >= m || d < 0.01) continue;
+          // o maior empurra mais: cada um anda a sua parte proporcional
+          const push = (m - d) / d, wa = br / m, wb = ar / m;
+          a.x -= dx * push * wa; a.y -= dy * push * wa;
+          b.x += dx * push * wb; b.y += dy * push * wb;
+        }
+      }
+    for (const d of L) {
+      const r0 = (d.bodyR || 30);
+      for (const p of w.streamer.propsNear(d.x, d.y, r0 + 400)) {
+        const cr = p.kind === 'cliff' ? p.foot * 0.8 : p.collider;
+        if (!cr) continue;
+        for (const [cx, cy, r] of pts(d)) {
+          const dx = cx - p.x, dy = cy - p.y, dd = Math.hypot(dx, dy), m = cr + r * 0.7;
+          if (dd >= m || dd < 0.01) continue;
+          d.x += (dx / dd) * (m - dd); d.y += (dy / dd) * (m - dd);
+        }
+      }
+    }
   }
 
   nearest(x, y, r) {
@@ -550,7 +596,7 @@ export class Dinos {
 // olha e ergue a cabeça, e deitado as pernas encolhem. Modelo: cabeça em +X, altura em +Y.
 const DEFORM_PARS = /* glsl */ `
 uniform vec4 uLeg[4];
-uniform float uLegN, uPivotY, uHalfW, uPhase, uAmp, uLift, uRest, uTime;
+uniform float uLegN, uPivotY, uHalfW, uPhase, uAmp, uLift, uRest, uTime, uLegBias;
 uniform float uTailX, uTailLen, uWag, uTurn, uNeckX, uNeckY, uHeadLen, uLookYaw, uLookPitch, uShake;
 `;
 const DEFORM = /* glsl */ `
@@ -565,7 +611,7 @@ const DEFORM = /* glsl */ `
     float w = wx * ws * wy;
     if (w <= 0.0) continue;
     float ph = 6.2831853 * (uPhase + L.w);
-    float ang = (-L.z + uAmp * sin(ph)) * w;
+    float ang = (-L.z + uLegBias + uAmp * sin(ph)) * w;
     vec2 d = vec2(p.x - L.x, p.y - uPivotY);
     float c = cos(ang), sn = sin(ang);
     d = vec2(d.x * c - d.y * sn, d.x * sn + d.y * c);
@@ -629,10 +675,12 @@ function measure(geo, biped) {
   });
   // pescoço: começa um pouco à frente do peito; altura média do corpo ali
   const neckX = biped ? x1 - L * 0.3 : x1 - L * 0.4;
-  let ny = 0, nn = 0, hy = 0, hn = 0;
+  let ny = 0, nn = 0, hy = 0, hn = 0, ty = 0, tn = 0;
+  const tailBase = hindX - L * 0.15;
   for (let i = 0; i < P.count; i++) {
     const x = P.getX(i);
     if (Math.abs(x - neckX) < L * 0.02) { ny += P.getY(i); nn++; }
+    if (Math.abs(x - tailBase) < L * 0.02) { ty += P.getY(i); tn++; }
     if (x > x1 - L * 0.05) { hy += P.getY(i); hn++; }
   }
   return {
@@ -640,6 +688,9 @@ function measure(geo, biped) {
     tailX: hindX - L * 0.1, tailLen: hindX - L * 0.1 - x0,
     neckX, neckY: nn ? ny / nn : H * 0.5, headLen: x1 - neckX,
     head: [x1, hn ? hy / hn : H * 0.8], hindX, frontX: frontX ?? x1 - L * 0.35,
+    // tronco inclinado na pose do modelo (base da cauda → base do pescoço). Terópode de
+    // verdade anda com o corpo quase na horizontal: o excesso é desfeito no jogo.
+    tilt: nn && tn ? Math.atan2(ny / nn - ty / tn, neckX - tailBase) : 0,
   };
 }
 
@@ -654,6 +705,7 @@ class ModelBody {
     this.u = {
       uLeg: { value: [0, 1, 2, 3].map((k) => (legs[k] ? new THREE.Vector4(legs[k].x, legs[k].side, legs[k].neutral, legs[k].off) : new THREE.Vector4())) },
       uLegN: { value: legs.length }, uPivotY: { value: M.pivotY }, uHalfW: { value: M.halfW },
+      uLegBias: { value: 0 },
       uPhase: { value: 0 }, uAmp: { value: 0 }, uLift: { value: 0 }, uRest: { value: 0 }, uTime: { value: 0 },
       uTailX: { value: M.tailX }, uTailLen: { value: Math.max(0.01, M.tailLen) }, uWag: { value: 1.4 }, uTurn: { value: 0 },
       uNeckX: { value: M.neckX }, uNeckY: { value: M.neckY }, uHeadLen: { value: M.headLen },
@@ -700,14 +752,18 @@ class ModelBody {
     // medido num trecho longo (do quadril até perto da cabeça) e limitado: terreno irregular não o deixa em pé
     const hb = (M.hindX - M.L * 0.12) * k, hf = (M.hindX + M.L * 0.3) * k;
     const gB = world.groundZ(d.x + fx * hb, d.y + fy * hb), gF = world.groundZ(d.x + fx * hf, d.y + fy * hf);
-    const slopeT = clamp(Math.atan2(gF - gB, hf - hb), -0.3, 0.3) * (1 - d.swim);
+    // bípedes mantêm o corpo quase nivelado na encosta; quadrúpedes acompanham mais o chão
+    const lim = sp.biped ? 0.12 : 0.25;
+    const slopeT = clamp(Math.atan2(gF - gB, hf - hb), -lim, lim) * (1 - d.swim);
     this.pitch = this.pitch === undefined ? slopeT : this.pitch + (slopeT - this.pitch) * 0.1;
     const pitch = this.pitch;
     const gC = world.groundZ(d.x + fx * M.hindX * k, d.y + fy * M.hindX * k);
     const bob = Math.abs(Math.sin(d.phase * Math.PI * 2)) * (2 + run * 8) * moving * k / this.scale;
     // pés um pouco enterrados (não flutuam); nadando, só as costas ficam fora d'água
     this.group.position.set(d.x, Math.min(gC, (gB + gF) / 2) - 4 - d.swim * M.pivotY * k * 0.95 - bob, d.y);
-    this.group.rotation.set(0, -d.a, pitch);
+    const fix = sp.biped ? Math.max(0, M.tilt - 0.12) : 0;
+    this.u.uLegBias.value = fix;
+    this.group.rotation.set(0, -d.a, pitch - fix);
     // shader
     const u = this.u;
     u.uTime.value = d.t;
@@ -722,7 +778,7 @@ class ModelBody {
     // pescoço: ruge erguendo a cabeça; saurópode pasta abaixando; deitado, cabeça no chão
     const roar = d.state === 'roar' ? 1 : 0;
     const eat = d.state === 'eat' ? 1 : 0;
-    const pitchT = roar * 0.45 - eat * (sp.biped ? 0.3 : 0.7) - d.rest * 0.35 + Math.sin(d.t * 0.7) * 0.04;
+    const pitchT = roar * 0.22 - eat * (sp.biped ? 0.3 : 0.7) - d.rest * 0.35 + Math.sin(d.t * 0.7) * 0.04;
     u.uLookPitch.value += (pitchT - u.uLookPitch.value) * 0.08;
     u.uLookYaw.value += (Math.sin(d.t * 0.4 + d.id) * 0.18 * (1 - moving) - u.uLookYaw.value) * 0.05;
     u.uShake.value = roar * (d.timer < 1.3 && d.timer > 0.2 ? 1 : 0);
