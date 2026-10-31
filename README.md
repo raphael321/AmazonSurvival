@@ -43,6 +43,13 @@ Amazon Survival/
                               perf-web-optimization, subagent-creator
 ```
 
+## Rodar o piloto 3D (Three.js)
+
+```bash
+cd game3d && npm install && npm run dev
+# abra http://localhost:8090
+```
+
 ## Rodar o jogo
 
 ```bash

@@ -23,7 +23,11 @@ Leia antes de qualquer trabalho grande:
 | `docs/07-decisoes.md` | Registro de decisões tomadas (atualize sempre) |
 | `prompts/` | Prompts prontos para cada etapa |
 
-## Stack e regras técnicas (inegociáveis no piloto)
+## Stack e regras técnicas
+
+> **Atualização 2026-10-31:** o Raphael aprovou um **piloto 3D em Three.js** em `game3d/` (ver `docs/07-decisoes.md`). As regras abaixo valem para o piloto 2D em `game/`; no 3D usamos Three.js (WebGL), objetos/terreno gerados por código e, quando ele trouxer, modelos próprios em .glb leves. Alvo: navegador e Steam (Electron + steamworks.js).
+
+### Piloto 2D (`game/`)
 
 - **HTML5 + JavaScript puro (ES modules) + Canvas 2D.** Sem engine (nada de Phaser, Unity, Godot), sem WebGL, sem framework de UI.
 - **Nenhuma imagem no jogo.** Personagens, criaturas, cenário e efeitos são **desenhados por código**. Imagens geradas por IA podem existir só como **referência** em `refs/` (nunca carregadas pelo jogo).

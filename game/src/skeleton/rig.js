@@ -17,6 +17,9 @@ export class Rig {
     this.feet = legs.map(() => ({ pos: null, from: null, to: null, t: 1 }));
     this.legs = legs.map(() => ({ hip: [0, 0, 0], knee: [0, 0, 0], foot: [0, 0, 0] }));
     this.bob = 0;
+    // opcional: altura do chão sob um ponto, relativa à base do corpo (terreno 3D contínuo).
+    // Sem ela os pés pisam em z = 0 (chão plano, como no 2D).
+    this.groundRel = null;
   }
 
   homeOf(i) {
@@ -81,7 +84,13 @@ export class Rig {
     this.def.forEach((d, i) => {
       const hip = this.frame.w(d.root[0], d.root[1], d.root[2] + rootZ);
       const pole = this.frame.dir(d.pole[0], d.pole[1], d.pole[2]);
-      const ik = solveTwoBone(hip, this.feet[i].pos, d.l1, d.l2, pole);
+      let target = this.feet[i].pos;
+      if (this.groundRel) {
+        // pé apoiado no relevo; limitado ao que a perna alcança
+        const g = Math.max(-14, Math.min(14, this.groundRel(target[0], target[1])));
+        target = [target[0], target[1], target[2] + g];
+      }
+      const ik = solveTwoBone(hip, target, d.l1, d.l2, pole);
       const leg = this.legs[i];
       leg.hip = hip;
       leg.knee = ik.joint;

@@ -1,0 +1,16 @@
+{
+  "name": "amazon-survival-3d",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "esbuild src/main.js --bundle --format=esm --sourcemap --outdir=www --servedir=www --serve=8090",
+    "build": "esbuild src/main.js --bundle --format=esm --minify --outfile=www/main.js"
+  },
+  "dependencies": {
+    "three": "0.170.0",
+    "tweakpane": "4.0.5"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.0"
+  }
+}
