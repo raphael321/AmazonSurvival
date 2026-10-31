@@ -153,7 +153,9 @@ export class RigBody {
     this.group.position.set(d.x, Math.min(gC, (gB + gF) / 2) - 2 - restDrop - crouchDrop - d.swim * this.height * k * 0.6 + (d.jz || 0), d.y);
     // no pulo o corpo sobe de nariz e desce de nariz
     const leapPitch = d.jz > 0 ? clamp((d.vz || 0) / 1400, -0.35, 0.35) : 0;
-    this.group.rotation.set(0, -d.a, this.pitch + leapPitch);
+    // abatido: tomba de lado
+    const roll = d.dead ? Math.min(1, d.deadT * 1.6) ** 2 * 1.4 : 0;
+    this.group.rotation.set(roll, -d.a, this.pitch + leapPitch);
     this.group.scale.setScalar(k);
     // ossos: volta para a pose de descanso, depois animação pronta e camada procedural
     for (const b of Object.values(this.bones)) b.quaternion.copy(b.userData.rest);

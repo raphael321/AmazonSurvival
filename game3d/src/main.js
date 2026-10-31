@@ -10,6 +10,7 @@ import { DEFAULTS3D } from './field.js';
 import { PlayerMesh, CapybaraMesh } from './actors3d.js';
 import { Dinos } from './dinos.js';
 import { Waterfall } from './waterfall.js';
+import { Inventory, Combat } from './combat.js';
 import { loadRigs } from './rigs.js';
 import { loadModels } from './assets.js';
 import { GameMap } from './map3d.js';
@@ -112,6 +113,9 @@ const popups = new Popups();
 // dinossauros (Ecos do Cretáceo): um de cada perto do começo, depois a população se mantém em volta
 const dinos = new Dinos(scene, world);
 dinos.showcase(spawn[0], spawn[1]);
+// inventário (1–4: facão, machado, espada, arco) e combate
+const inv = new Inventory();
+const combat = new Combat(scene, world, dinos, inv);
 // animais com esqueleto (onça, amazonssauro): trocam o corpo assim que o arquivo chega
 loadRigs(window.__ASSET_BASE || '').then((r) => { dinos.rigs = r; });
 const view = { distance: 1150, pitch: 38, fly: false, shadows: true };
@@ -222,19 +226,8 @@ function aimAtMouse() {
 
 function onStrike(p) {
   const fx = Math.cos(p.angle), fy = Math.sin(p.angle);
-  // golpe acerta o dinossauro que está à frente (perto do corpo, do quadril à boca)
-  for (const d of dinos.list) {
-    if (!d.pelvis || !d.mouth) continue;
-    const ax = d.pelvis[0], ay = d.pelvis[1], bx = d.mouth[0], by = d.mouth[1];
-    const t = Math.max(0, Math.min(1, ((p.x - ax) * (bx - ax) + (p.y - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2 || 1)));
-    const cx = ax + (bx - ax) * t, cy = ay + (by - ay) * t, dd = Math.hypot(cx - p.x, cy - p.y);
-    if (dd < (d.bodyR || 40) + 70 && ((cx - p.x) * fx + (cy - p.y) * fy) / (dd || 1) > 0.1) {
-      const calm = !d.sp.aggressive && !(d.angry > 0);
-      d.provoke();
-      const [x, y] = toScreen(cx, cy, p.z + 120);
-      popups.add(x, y, calm ? `${d.sp.nome} ficou furioso!` : 'Golpe!', { color: '#e2553d' });
-    }
-  }
+  // golpe com a arma da mão: animal à frente ou árvore (o machado derruba rápido)
+  combat.strike(p);
   const dx = capy.x - p.x, dy = capy.y - p.y, d = Math.hypot(dx, dy);
   if (d < 75 && (dx * fx + dy * fy) / (d || 1) > 0.2) {
     capy.hitBy(p);
@@ -269,7 +262,8 @@ let hint = '', fps = 60, fpsAcc = 0, fpsN = 0, last = performance.now(), reporte
 // a entrada é relativa à tela: com a câmera em 45° vale a mesma conversão do isométrico
 const wrapInput = {
   get mouse() { return input.mouse; },
-  get clicked() { return input.clicked; },
+  // o clique só vira golpe com arma de mão; com o arco ele atira (veja update)
+  get clicked() { return input.clicked && inv.atual.melee; },
   down: (...c) => input.down(...c),
   hit: (...c) => input.hit(...c),
   // WASD relativo à câmera: W anda para onde a câmera olha. O Player converte "direção de tela"
@@ -310,6 +304,18 @@ function update(dt) {
   // vida volta devagar
   player.hp = Math.min(player.maxHp, player.hp + dt * 1.5);
   if (input.hit('KeyE')) interact();
+  // itens: 1–4 trocam; com o arco, o clique atira; C faz 5 flechas com 1 madeira
+  inv.update(input);
+  player.weapon = inv.id;
+  if (input.clicked && !inv.atual.melee) combat.shoot(player, camera);
+  if (input.hit('KeyC')) {
+    const s = toScreen(player.x, player.y, player.z + 100);
+    if (inv.madeira > 0) { inv.madeira--; inv.flechas += 5; popups.add(s[0], s[1], '+5 flechas', { color: '#d8c9a0' }); }
+    else popups.add(s[0], s[1], 'Precisa de madeira (corte árvores com o machado)', { color: '#f29a4b' });
+  }
+  combat.update(dt);
+  for (const ev of combat.events) { const s = toScreen(ev.x, ev.y, ev.z); popups.add(s[0], s[1], ev.texto, { color: ev.cor }); }
+  combat.events.length = 0;
   popups.update(dt);
 
   const dCapy = Math.hypot(capy.x - player.x, capy.y - player.y);
@@ -367,6 +373,7 @@ function drawOverlay() {
   }
   popups.draw(hctx);
   drawHud(hctx, sw, sh, { player, capy, hint, fps, showFps: true });
+  inv.draw(hctx, sw, sh);
 }
 
 function frame(now) {
@@ -390,4 +397,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__game = { waterfall, dinos, fish, gameCam, sky, grass, grassSettings, windSettings, water, trails, campfire, gameMap, world, player, capy, camera, renderer, scene, view, params, get fps() { return fps; } };
+window.__game = { inv, combat, waterfall, dinos, fish, gameCam, sky, grass, grassSettings, windSettings, water, trails, campfire, gameMap, world, player, capy, camera, renderer, scene, view, params, get fps() { return fps; } };

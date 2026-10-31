@@ -119,9 +119,34 @@ export class PlayerMesh {
       b.seg(el, h, 3.1, m.skin);
       b.ball(h, 3.4, m.skin);
     }
-    // facão
-    b.seg(add(p.bladeBase, p.bladeDir, -5), add(p.bladeBase, p.bladeDir, 3), 1.6, m.handle, false);
-    b.seg(add(p.bladeBase, p.bladeDir, 3), p.bladeTip, 1.5, m.steel);
+    // arma da mão (o golpe usa a mesma linha base → ponta do facão)
+    const dir = p.bladeDir, base = p.bladeBase;
+    // lado da lâmina: perpendicular ao cabo, no plano horizontal
+    const sl = Math.hypot(dir[0], dir[1]) || 1, side = [-dir[1] / sl, dir[0] / sl, 0];
+    const wpn = player.weapon || 'facao';
+    if (wpn === 'machado') {
+      const top = add(base, dir, 30);
+      b.seg(add(base, dir, -8), top, 1.7, m.handle, false);
+      b.seg(add(top, dir, -7), add(add(top, dir, -3), side, 9), 4.2, m.steel); // lâmina larga
+      b.seg(add(top, dir, -6), add(top, side, -4), 2.2, m.steel); // contrapeso
+    } else if (wpn === 'espada') {
+      b.seg(add(base, dir, -6), add(base, dir, 2), 1.5, m.handle, false);
+      b.seg(add(add(base, dir, 2), side, -6), add(add(base, dir, 2), side, 6), 1.3, m.belt, false); // guarda
+      b.seg(add(base, dir, 3), add(base, dir, 42), 1.6, m.steel);
+    } else if (wpn === 'arco') {
+      // arco na mão esquerda: arco de pedaços + corda
+      const h = p.hL, up = [0, 0, 1], f = p.fwd || [Math.cos(player.angle), Math.sin(player.angle), 0];
+      let prev = null;
+      for (let k = 0; k <= 6; k++) {
+        const a = (k / 6 - 0.5) * 2.2, q = add(add(h, up, Math.sin(a) * 26), f, Math.cos(a) * 9 - 6);
+        if (prev) b.seg(prev, q, 1.4, m.handle, false);
+        prev = q;
+      }
+      b.seg(add(add(h, up, 25), f, -4), add(add(h, up, -25), f, -4), 0.35, m.steel, false);
+    } else {
+      b.seg(add(base, dir, -5), add(base, dir, 3), 1.6, m.handle, false);
+      b.seg(add(base, dir, 3), p.bladeTip, 1.5, m.steel);
+    }
     // cabeça, cabelo, olhos
     const f = p.headFwd, r = p.headRight;
     b.ball(p.head, 9, m.skin);

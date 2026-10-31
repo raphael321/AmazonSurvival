@@ -290,7 +290,7 @@ export class PropPool {
       } else if (SOLID.has(got.name) && !p.collider) p.collider = Math.max(got.m.size.x, got.m.size.z) * got.m.scale * v * 0.35;
     } else if (p.kind === 'samauma' || p.kind === 'forest') { push('forestTrunk', v); push('forestCanopy', v); }
     // árvores da mata: colisão só no tronco, para dar para andar entre elas
-    if (p.kind === 'forest' && !p.collider) p.collider = 20 * v;
+    if (p.kind === 'forest' && !p.collider) p.collider = 34 * v;
     // moita e pedra feitas por código só enquanto os modelos não chegaram (antes saíam as duas juntas)
     else if (p.kind === 'bush' && !got) push('bush', 0.85 + (p.variant % 3) * 0.15);
     else if (p.kind === 'rock' && !got) push('rock', p.size || 1);

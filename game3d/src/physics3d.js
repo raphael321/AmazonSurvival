@@ -40,7 +40,7 @@ export class Physics {
     const models = w.pool.models;
     if (!models) return out;
     const take = (p) => {
-      if (!p.phys || Math.abs(p.x - x) > r + (p.phys.reach || 0) || Math.abs(p.y - y) > r + (p.phys.reach || 0)) return;
+      if (!p.phys || w.cut.has(p.id) || Math.abs(p.x - x) > r + (p.phys.reach || 0) || Math.abs(p.y - y) > r + (p.phys.reach || 0)) return;
       const model = models[p.phys.name];
       if (!model) return;
       if (!p.phys.inverse) {

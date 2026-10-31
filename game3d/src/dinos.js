@@ -34,14 +34,14 @@ function ik2(A, T, l1, l2, pole) {
 export const SPECIES = {
   // onça-pintada: só existe com o modelo rigado (rig-onca.glb); ~2,4 m com a cauda
   onca: {
-    nome: 'Onça-pintada', biped: false, rig: 'onca', rigOnly: true, ring: 260, leap: true, crouch: true, turn: 3.5, length: 120, walk: 85, run: 420, freq: 1.1, aggressive: true, habitat: 'mata', bite: 15,
+    nome: 'Onça-pintada', biped: false, rig: 'onca', rigOnly: true, ring: 260, leap: true, crouch: true, turn: 3.5, hp: 90, carne: 4, length: 120, walk: 85, run: 420, freq: 1.1, aggressive: true, habitat: 'mata', bite: 15,
     hip: 40, torso: 60, bodyW: 16, bodyH: 20, cor: {},
   },
   pycno: {
     nome: 'Pycnonemosaurus', biped: true, hip: 128, hipW: 26, torso: 150, bodyW: 40, bodyH: 52, chestR: 36,
     neck: [[46, 0.55], [40, 0.35]], neckR: 24, head: { len: 72, h: 34, w: 24, snout: 0.9, jaw: 0.55 },
     tail: { n: 8, len: 240, r: 30 }, leg: [72, 68, 40], legR: 17, arm: [16, 12], armR: 5,
-    walk: 72, run: 300, freq: 0.9, aggressive: true, habitat: 'mata', bite: 22, ring: 480, model: 'dino_pycno', length: 430,
+    walk: 72, run: 300, freq: 0.9, aggressive: true, habitat: 'mata', bite: 22, ring: 480, hp: 200, carne: 8, model: 'dino_pycno', length: 430,
     cor: { costas: '#94796e', claro: '#c8b3a1', barriga: '#d7c6b1', escuro: '#5e443d', destaque: '#8b4038', olho: '#1d1a12' },
   },
   oxalaia: {
@@ -49,14 +49,14 @@ export const SPECIES = {
     neck: [[48, 0.6], [44, 0.35], [40, 0.05]], neckR: 22, head: { len: 118, h: 26, w: 20, snout: 1.6, jaw: 0.45 },
     tail: { n: 9, len: 320, r: 30 }, leg: [80, 74, 44], legR: 18, arm: [34, 28], armR: 8,
     sail: { h: 78, len: 190 },
-    walk: 64, run: 240, freq: 0.8, aggressive: true, habitat: 'rio', swim: true, bite: 28, ring: 520, model: 'dino_oxalaia', length: 560,
+    walk: 64, run: 240, freq: 0.8, aggressive: true, habitat: 'rio', swim: true, bite: 28, ring: 520, hp: 240, carne: 10, model: 'dino_oxalaia', length: 560,
     cor: { costas: '#3f3c31', claro: '#cfc293', barriga: '#d8cca1', escuro: '#2a2820', destaque: '#a3342b', olho: '#a3342b' },
   },
   amazon: {
     nome: 'Amazonssauro', biped: false, hip: 150, hipW: 34, torso: 190, bodyW: 56, bodyH: 62, chestR: 48, shoulder: 0.94,
     neck: [[48, 0.95], [46, 0.85], [44, 0.75], [42, 0.62], [40, 0.45], [36, 0.25]], neckR: 22, head: { len: 46, h: 22, w: 18, snout: 0.7, jaw: 0.2 },
     tail: { n: 11, len: 380, r: 40 }, leg: [86, 76, 22], legR: 22, front: [78, 66, 18], frontR: 19,
-    walk: 55, run: 130, freq: 0.7, aggressive: false, habitat: 'aberto', herd: 2, bite: 18, ring: 420, model: 'dino_amazon', length: 600, rig: 'amazon', grazer: true,
+    walk: 55, run: 130, freq: 0.7, aggressive: false, habitat: 'aberto', herd: 2, bite: 18, ring: 420, hp: 260, carne: 12, model: 'dino_amazon', length: 600, rig: 'amazon', grazer: true,
     cor: { costas: '#7c6748', claro: '#a99272', barriga: '#c1ab88', escuro: '#5b4932', destaque: '#6c573b', olho: '#1d1a12' },
   },
 };
@@ -157,6 +157,8 @@ export class Dino {
     this.swim = 0;
     this.biteCd = 0;
     this.scale = 0.9 + Math.random() * 0.2;
+    this.hp = this.sp.hp || 150;
+    this.dead = false;
     this.feet = null;
   }
 
@@ -191,6 +193,7 @@ export class Dino {
 
   think(dt, world, player) {
     const sp = this.sp;
+    if (this.dead) { this.want = 0; return; }
     const dx = player.x - this.x, dy = player.y - this.y, dp = Math.hypot(dx, dy);
     this.timer -= dt;
     this.biteCd -= dt;
@@ -295,6 +298,21 @@ export class Dino {
     this.want = speed * this.scale;
   }
 
+  // dano: devolve true se morreu
+  damage(n) {
+    if (this.dead) return false;
+    this.hp -= n;
+    if (this.hp <= 0) {
+      this.dead = true;
+      this.deadT = 0;
+      this.state = 'dead';
+      this.want = 0;
+      return true;
+    }
+    this.provoke();
+    return false;
+  }
+
   // levou um golpe: fica bravo por um tempo (herbívoros só atacam assim)
   provoke() {
     this.angry = 25;
@@ -303,6 +321,7 @@ export class Dino {
 
   update(dt, world, player) {
     this.t += dt;
+    if (this.dead) this.deadT += dt;
     this.think(dt, world, player);
     if (this.jz > 0 || this.vz > 0) {
       this.vz = (this.vz || 0) - 1500 * dt;
@@ -550,7 +569,8 @@ export class Dinos {
     if (!this.enabled) { this.crew.begin(); this.crew.end(); return; }
     // longe demais: some; população repõe longe da vista
     this.list = this.list.filter((d) => {
-      const keep = Math.hypot(d.x - player.x, d.y - player.y) < 6000;
+      // longe demais some; abatido fica 40 s no chão
+      const keep = Math.hypot(d.x - player.x, d.y - player.y) < 6000 && !(d.dead && d.deadT > 40);
       if (!keep && d.body) d.body.dispose();
       return keep;
     });
@@ -799,7 +819,8 @@ class ModelBody {
     this.group.position.set(d.x, Math.min(gC, (gB + gF) / 2) - 4 - d.swim * M.pivotY * k * 0.95 - bob + (d.jz || 0), d.y);
     const fix = sp.biped ? Math.max(0, M.tilt - 0.12) : 0;
     this.u.uLegBias.value = fix;
-    this.group.rotation.set(0, -d.a, pitch - fix);
+    const roll = d.dead ? Math.min(1, d.deadT * 1.6) ** 2 * 1.35 : 0;
+    this.group.rotation.set(roll, -d.a, pitch - fix);
     // shader
     const u = this.u;
     u.uTime.value = d.t;

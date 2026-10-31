@@ -13,6 +13,7 @@ export class World3D {
     this.time = 0;
     this.picked = new Map();
     this.extras = []; // objetos fora do gerador (ex.: vitrine perto do início)
+    this.cut = new Set(); // árvores derrubadas (ids)
     this.fixed = []; // objetos fixos de lugares especiais (pedras da cachoeira)
     this.clearZones = []; // áreas sem árvores/objetos do gerador (ex.: água da cachoeira)
     this.pool = new PropPool(scene);
@@ -53,7 +54,7 @@ export class World3D {
   colliders(x, y) {
     const near = this.streamer.propsNear(x, y, 160);
     for (const p of this.extras) if (Math.abs(p.x - x) < 200 && Math.abs(p.y - y) < 200) near.push(p);
-    return near.filter((p) => p.collider);
+    return near.filter((p) => p.collider && !this.cut.has(p.id));
   }
 
   resolve(e, rad, px, py) {
@@ -134,7 +135,7 @@ export class World3D {
     const c0 = this.pool.center;
     if (this.pool.dirty || !c0 || Math.hypot(x - c0[0], y - c0[1]) > 250) {
       const all = [];
-      for (const c of this.streamer.chunks.values()) for (const p of c.props.list) all.push(p);
+      for (const c of this.streamer.chunks.values()) for (const p of c.props.list) if (!this.cut.has(p.id)) all.push(p);
       all.push(...this.extras);
       // pontes dos chunks carregados
       for (const c of this.streamer.chunks.values()) {
