@@ -34,14 +34,14 @@ function ik2(A, T, l1, l2, pole) {
 export const SPECIES = {
   // onça-pintada: só existe com o modelo rigado (rig-onca.glb); ~2,4 m com a cauda
   onca: {
-    nome: 'Onça-pintada', biped: false, rig: 'onca', rigOnly: true, length: 120, walk: 85, run: 420, freq: 1.1, aggressive: true, habitat: 'mata', bite: 15,
+    nome: 'Onça-pintada', biped: false, rig: 'onca', rigOnly: true, ring: 260, leap: true, crouch: true, turn: 3.5, length: 120, walk: 85, run: 420, freq: 1.1, aggressive: true, habitat: 'mata', bite: 15,
     hip: 40, torso: 60, bodyW: 16, bodyH: 20, cor: {},
   },
   pycno: {
     nome: 'Pycnonemosaurus', biped: true, hip: 128, hipW: 26, torso: 150, bodyW: 40, bodyH: 52, chestR: 36,
     neck: [[46, 0.55], [40, 0.35]], neckR: 24, head: { len: 72, h: 34, w: 24, snout: 0.9, jaw: 0.55 },
     tail: { n: 8, len: 240, r: 30 }, leg: [72, 68, 40], legR: 17, arm: [16, 12], armR: 5,
-    walk: 72, run: 300, freq: 0.9, aggressive: true, habitat: 'mata', bite: 22, model: 'dino_pycno', length: 430,
+    walk: 72, run: 300, freq: 0.9, aggressive: true, habitat: 'mata', bite: 22, ring: 480, model: 'dino_pycno', length: 430,
     cor: { costas: '#94796e', claro: '#c8b3a1', barriga: '#d7c6b1', escuro: '#5e443d', destaque: '#8b4038', olho: '#1d1a12' },
   },
   oxalaia: {
@@ -49,14 +49,14 @@ export const SPECIES = {
     neck: [[48, 0.6], [44, 0.35], [40, 0.05]], neckR: 22, head: { len: 118, h: 26, w: 20, snout: 1.6, jaw: 0.45 },
     tail: { n: 9, len: 320, r: 30 }, leg: [80, 74, 44], legR: 18, arm: [34, 28], armR: 8,
     sail: { h: 78, len: 190 },
-    walk: 64, run: 240, freq: 0.8, aggressive: true, habitat: 'rio', swim: true, bite: 28, model: 'dino_oxalaia', length: 560,
+    walk: 64, run: 240, freq: 0.8, aggressive: true, habitat: 'rio', swim: true, bite: 28, ring: 520, model: 'dino_oxalaia', length: 560,
     cor: { costas: '#3f3c31', claro: '#cfc293', barriga: '#d8cca1', escuro: '#2a2820', destaque: '#a3342b', olho: '#a3342b' },
   },
   amazon: {
     nome: 'Amazonssauro', biped: false, hip: 150, hipW: 34, torso: 190, bodyW: 56, bodyH: 62, chestR: 48, shoulder: 0.94,
     neck: [[48, 0.95], [46, 0.85], [44, 0.75], [42, 0.62], [40, 0.45], [36, 0.25]], neckR: 22, head: { len: 46, h: 22, w: 18, snout: 0.7, jaw: 0.2 },
     tail: { n: 11, len: 380, r: 40 }, leg: [86, 76, 22], legR: 22, front: [78, 66, 18], frontR: 19,
-    walk: 55, run: 130, freq: 0.7, aggressive: false, habitat: 'aberto', herd: 2, bite: 18, model: 'dino_amazon', length: 600, rig: 'amazon', grazer: true,
+    walk: 55, run: 130, freq: 0.7, aggressive: false, habitat: 'aberto', herd: 2, bite: 18, ring: 420, model: 'dino_amazon', length: 600, rig: 'amazon', grazer: true,
     cor: { costas: '#7c6748', claro: '#a99272', barriga: '#c1ab88', escuro: '#5b4932', destaque: '#6c573b', olho: '#1d1a12' },
   },
 };
@@ -163,8 +163,9 @@ export class Dino {
   // ---------- comportamento ----------
   okGround(world, x, y) {
     const f = world.field, h = f.H(x, y);
-    if (h < -6 && !this.sp.swim) return false;
-    if (h > 0 && f.slope(x, y) > 1.1) return false;
+    // água rasa (margem, igarapé) dá para atravessar; só a funda é do Oxalaia
+    if (h < -30 && !this.sp.swim) return false;
+    if (h > 0 && f.slope(x, y) > 1.5) return false;
     return true;
   }
 
@@ -193,9 +194,14 @@ export class Dino {
     const dx = player.x - this.x, dy = player.y - this.y, dp = Math.hypot(dx, dy);
     this.timer -= dt;
     this.biteCd -= dt;
-    this.angry = Math.max(0, (this.angry || 0) - dt);
-    const hostile = sp.aggressive || this.angry > 0;
-    const alert = hostile && dp < (this.angry > 0 ? 900 : sp.habitat === 'rio' ? 600 : 520) && !player.dead && this.state !== 'chase';
+    this.angry = Math.max(0, (this.angry || 0) - Math.max(0, dt));
+    const hostile = sp.aggressive || this.angry > 0.5;
+    const hunting = ['roar', 'stalk', 'charge', 'leap', 'retreat'].includes(this.state);
+    const alert = hostile && !hunting && dp < (this.angry > 0 ? 900 : sp.habitat === 'rio' ? 650 : sp.leap ? 700 : 560) && !player.dead;
+    // desiste da caça: jogador longe, morto, ou o bicho longe demais de casa
+    if (hunting && (dp > 1500 || player.dead || Math.hypot(this.x - this.home[0], this.y - this.home[1]) > 2600)) {
+      this.target = this.home; this.setState('walk', 20);
+    }
     switch (this.state) {
       case 'idle':
         this.want = 0;
@@ -231,25 +237,47 @@ export class Dino {
         if (this.timer <= 0 || dp < 200) this.setState('idle', 1);
         break;
       case 'roar':
-        // vira para o jogador e ruge antes do ataque (aviso justo)
+        // aviso justo: vira para o jogador (o terópode ruge; a onça só encara, agachada)
         this.want = 0;
         this.a += clamp(angDiff(this.a, Math.atan2(dy, dx)), -2.5 * dt, 2.5 * dt);
-        if (this.timer <= 0) this.setState('chase', 9);
+        if (this.timer <= 0) { this.orbit = Math.random() < 0.5 ? 1 : -1; this.setState('stalk', 3 + Math.random() * 4); }
         break;
-      case 'chase': {
-        // desiste longe de casa, se o jogador some ou se cansa
-        const fromHome = Math.hypot(this.x - this.home[0], this.y - this.home[1]);
-        if (dp > 1200 || this.timer <= 0 || fromHome > 2200 || player.dead) { this.target = this.home; this.setState('walk', 20); break; }
-        this.steer(dt, Math.atan2(dy, dx), dp < 260 ? sp.run * 0.75 : sp.run, world);
+      case 'stalk': {
+        // rodeia o jogador a uma distância segura, devagar, procurando a hora do bote
+        const R = (sp.ring || 400) * this.scale;
+        const ang = Math.atan2(this.y - player.y, this.x - player.x) + this.orbit * 0.55;
+        const tx = player.x + Math.cos(ang) * R - this.x, ty = player.y + Math.sin(ang) * R - this.y;
+        this.steer(dt, Math.atan2(ty, tx), sp.walk * (sp.leap ? 1.4 : 1.2), world);
+        // às vezes muda o sentido da volta
+        if (Math.random() < dt * 0.15) this.orbit *= -1;
+        if (this.timer <= 0) this.setState('charge', 4);
         break;
       }
+      case 'charge':
+        // investida em linha reta; a onça pula no fim
+        // perto do alvo freia e vira mais rápido (senão passa reto feito trem)
+        this.turnBoost = dp < 320 * this.scale ? 2.2 : 1;
+        this.steer(dt, Math.atan2(dy, dx), dp < 320 * this.scale ? sp.run * 0.55 : sp.run, world);
+        if (sp.leap && dp < 230 * this.scale && dp > 90) { this.vz = 520; this.jz = this.jz || 0.01; this.setState('leap', 2); }
+        else if (this.timer <= 0) this.setState('retreat', 1.5);
+        break;
+      case 'leap':
+        // no ar: segue em frente sem virar; pousa e recua
+        this.want = sp.run * 1.15 * this.scale;
+        if (!(this.jz > 0)) this.setState('retreat', 1.4);
+        break;
+      case 'retreat':
+        // depois do bote: se afasta para voltar a rodear
+        this.steer(dt, Math.atan2(-dy, -dx) + (this.orbit || 1) * 0.6, sp.run * 0.55, world);
+        if (this.timer <= 0) this.setState('stalk', 3 + Math.random() * 4);
+        break;
     }
     // poses suaves
     const restT = this.state === 'rest' ? 1 : 0;
     this.rest += (restT - this.rest) * (1 - Math.exp(-dt * 1.2));
     const rearT = this.state === 'eat' ? 1 : this.state === 'roar' && this.timer > 0.3 ? 0.35 : 0;
     this.rear += (rearT - this.rear) * (1 - Math.exp(-dt * 2));
-    const jawT = this.state === 'roar' && this.timer > 0.2 && this.timer < 1.4 ? 1 : this.state === 'chase' && dp < 200 ? 0.7 : this.state === 'eat' ? 0.3 * (Math.sin(this.t * 6) > 0 ? 1 : 0) : 0;
+    const jawT = this.state === 'roar' && this.timer > 0.2 && this.timer < 1.4 ? 1 : (this.state === 'charge' || this.state === 'leap') && dp < 260 ? 0.8 : this.state === 'eat' ? 0.3 * (Math.sin(this.t * 6) > 0 ? 1 : 0) : 0;
     this.jaw += (jawT - this.jaw) * (1 - Math.exp(-dt * 10));
   }
 
@@ -262,7 +290,7 @@ export class Dino {
       best = null;
     }
     if (best === null) { this.want = 0; this.timer = Math.min(this.timer, 0.5); return; }
-    const turn = (this.sp.biped ? 2.2 : 1.1) * dt;
+    const turn = (this.sp.turn || (this.sp.biped ? 2.2 : 1.1)) * (this.state === 'charge' ? this.turnBoost || 1 : 1) * dt;
     this.a += clamp(angDiff(this.a, best), -turn, turn);
     this.want = speed * this.scale;
   }
@@ -276,6 +304,13 @@ export class Dino {
   update(dt, world, player) {
     this.t += dt;
     this.think(dt, world, player);
+    if (this.jz > 0 || this.vz > 0) {
+      this.vz = (this.vz || 0) - 1500 * dt;
+      this.jz = Math.max(0, (this.jz || 0) + this.vz * dt);
+      if (this.jz === 0) this.vz = 0;
+    }
+    const crouchT = this.sp.crouch && (this.state === 'stalk' || this.state === 'roar') ? 1 : 0;
+    this.crouch = (this.crouch || 0) + (crouchT - (this.crouch || 0)) * (1 - Math.exp(-dt * 4));
     const sp = this.sp;
     const acc = this.want > this.speed ? 260 : 380;
     this.speed += clamp(this.want - this.speed, -acc * dt, acc * dt);
@@ -294,7 +329,7 @@ export class Dino {
     const freq = sp.freq * Math.sqrt(Math.max(0.05, v / sp.walk));
     if (v > 2) this.phase = (this.phase + dt * freq) % 1;
     // mordida
-    if ((sp.aggressive || this.angry > 0) && this.state === 'chase' && this.biteCd <= 0 && this.mouth) {
+    if ((sp.aggressive || this.angry > 0) && (this.state === 'charge' || this.state === 'leap') && this.biteCd <= 0 && this.mouth) {
       // terópode morde (boca perto); saurópode pisoteia/empurra com o peito (cabeça fica no alto)
       const hit = sp.biped
         ? Math.hypot(player.x - this.mouth[0], player.y - this.mouth[1]) < 90 * this.scale && Math.abs((player.z || 0) + 40 - this.mouth[2]) < 200
@@ -302,6 +337,7 @@ export class Dino {
       if (hit) {
         this.biteCd = 1.6;
         this.bit = true;
+        if (this.state === 'charge') this.setState('retreat', 1.6);
       }
     }
   }
@@ -760,7 +796,7 @@ class ModelBody {
     const gC = world.groundZ(d.x + fx * M.hindX * k, d.y + fy * M.hindX * k);
     const bob = Math.abs(Math.sin(d.phase * Math.PI * 2)) * (2 + run * 8) * moving * k / this.scale;
     // pés um pouco enterrados (não flutuam); nadando, só as costas ficam fora d'água
-    this.group.position.set(d.x, Math.min(gC, (gB + gF) / 2) - 4 - d.swim * M.pivotY * k * 0.95 - bob, d.y);
+    this.group.position.set(d.x, Math.min(gC, (gB + gF) / 2) - 4 - d.swim * M.pivotY * k * 0.95 - bob + (d.jz || 0), d.y);
     const fix = sp.biped ? Math.max(0, M.tilt - 0.12) : 0;
     this.u.uLegBias.value = fix;
     this.group.rotation.set(0, -d.a, pitch - fix);

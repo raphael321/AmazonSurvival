@@ -126,7 +126,7 @@ const TARGET_H = {
   penhasco_raizes: 300, falesia: 340, blocos_musgo: 120,
 };
 // distância máxima de desenho por tamanho (além disso a neblina já esconde)
-const FAR = { big: 3400, mid: 2200, small: 1400 };
+const FAR = { big: 2900, mid: 2000, small: 1300 }; // mata fechada: a névoa úmida esconde o resto
 const LOD_NEAR = 850; // além disso usa a versão de baixo detalhe
 const SIZE = (name) => (TARGET_H[name] || 0) >= 130 ? 'big' : (TARGET_H[name] || 0) >= 58 ? 'mid' : 'small';
 // objetos que colidem pela forma real da malha (física), e não por um círculo
@@ -192,7 +192,7 @@ export function buildProps(world, ci, cj) {
     }
   // nada nasce na água (o rio 3D é escavado depois da grade do gerador) nem sobre pontes
   // objetos com colisão também ficam longe do caminho da ponte (cabeceiras livres)
-  const keep = list.filter((q) => field.H(q.x, q.y) > 1.5 && world.bridges.distToDeck(q.x, q.y) > world.bridges.halfWidth + (q.collider || q.foot || 0) + 8);
+  const keep = list.filter((q) => field.H(q.x, q.y) > 1.5 && !world.inClearZone(q.x, q.y) && world.bridges.distToDeck(q.x, q.y) > world.bridges.halfWidth + (q.collider || q.foot || 0) + 8);
   for (const q of keep) {
     if (q.kind === 'bush') q.collider = 0; // moitas, samambaias e flores: dá para atravessar
     q.z = q.zBase ?? field.H(q.x, q.y);
@@ -242,7 +242,8 @@ export class PropPool {
       this.define('m:' + name, m.geometry, sway ? swaying(m.material) : m.material, inflate(m.geometry, 1.6 / scale), SIZE(name) !== 'small' && !name.startsWith('moita') && !name.startsWith('samambaia'), sway);
       this.entries.get('m:' + name).far = FAR[SIZE(name)];
       if (m.lod) {
-        this.define('m:' + name + '@lod', m.lod.geometry, sway ? swaying(m.lod.material) : m.lod.material, inflate(m.lod.geometry, 1.6 / scale), false, sway);
+        // versão distante sem contorno de tinta: de longe ele some na névoa e custaria o dobro
+        this.define('m:' + name + '@lod', m.lod.geometry, sway ? swaying(m.lod.material) : m.lod.material, null, false, sway);
         this.entries.get('m:' + name + '@lod').far = FAR[SIZE(name)];
       }
     }
@@ -290,8 +291,9 @@ export class PropPool {
     } else if (p.kind === 'samauma' || p.kind === 'forest') { push('forestTrunk', v); push('forestCanopy', v); }
     // árvores da mata: colisão só no tronco, para dar para andar entre elas
     if (p.kind === 'forest' && !p.collider) p.collider = 20 * v;
-    else if (p.kind === 'bush') push('bush', 0.85 + (p.variant % 3) * 0.15);
-    else if (p.kind === 'rock') push('rock', p.size || 1);
+    // moita e pedra feitas por código só enquanto os modelos não chegaram (antes saíam as duas juntas)
+    else if (p.kind === 'bush' && !got) push('bush', 0.85 + (p.variant % 3) * 0.15);
+    else if (p.kind === 'rock' && !got) push('rock', p.size || 1);
     // frutinhas procedurais só enquanto os modelos não chegaram
     if (!got && p.kind === 'bush' && p.fruit && !p.picked) push('fruit', 0.85 + (p.variant % 3) * 0.15);
   }

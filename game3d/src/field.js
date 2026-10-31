@@ -15,7 +15,12 @@ export const DEFAULTS3D = {
   bridges: 0.75, // chance de ponte em cada trecho de rio (por chunk)
   bridgeSpan: 520, // vão máximo de uma ponte
   cliffs: 0.5, // chance de penhasco/falésia em cada trecho de encosta íngreme
-  forestAmount: 0.36, // terra firme: mata fechada cobre a maior parte (no 2D era 0.28)
+  // Amazônia de verdade: ~84% da terra em mata fechada, ~12% de água (rios e lagos), pouca rocha
+  forestAmount: 0.75, // no 2D era 0.28
+  waterLevel: 0.8,
+  riverWidth: 0.022,
+  heightExponent: 1.4,
+  rockLine: 0.8,
   blackWater: 0.5, // fração das bacias de água azul; o resto é barrenta (água branca, tipo Solimões)
 };
 

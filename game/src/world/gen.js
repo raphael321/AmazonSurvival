@@ -173,7 +173,11 @@ export class Gen {
         const id = i + ',' + j;
         if (this.isForest(i, j)) {
           // no máximo uma árvore por casa escura de um tabuleiro: sempre sobra passagem entre troncos
-          if ((i + j) % 2 === 0 && r < p.forestTrees * 2) out.push({ id, kind: 'forest', x: px, y: py, z, variant: Math.floor(v * 6), shadow: 24 });
+          if ((i + j) % 2 === 0 && r < p.forestTrees * 2) { out.push({ id, kind: 'forest', x: px, y: py, z, variant: Math.floor(v * 6), shadow: 24 }); continue; }
+          // sub-bosque: samambaias e moitas de sombra; palmeiras (açaí, paxiúba) nas baixadas úmidas
+          const r2 = hash2(i, j, s + 97);
+          if (r2 < p.bush * 2.5) out.push({ id, kind: 'bush', fruit: false, x: px, y: py, z, variant: Math.floor(v * 6), shadow: 30, collider: 18 });
+          else if (r2 < p.bush * 2.5 + p.acai * 1.5 && this.nearWater(i, j, 4)) out.push({ id, kind: 'acai', x: px, y: py, z, variant: Math.floor(v * 6), shadow: 22, collider: 14, canopy: 110 });
           continue;
         }
         if (rocky) {

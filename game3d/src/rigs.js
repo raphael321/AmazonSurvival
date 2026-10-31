@@ -148,8 +148,12 @@ export class RigBody {
     const slopeT = clamp(Math.atan2(gF - gB, L * 0.6), -0.3, 0.3) * (1 - d.swim);
     this.pitch += (slopeT - this.pitch) * 0.1;
     const restDrop = d.rest * this.height * k * 0.38;
-    this.group.position.set(d.x, Math.min(gC, (gB + gF) / 2) - 2 - restDrop - d.swim * this.height * k * 0.6, d.y);
-    this.group.rotation.set(0, -d.a, this.pitch);
+    // agachada ao rodear (corpo baixo, pronta para o bote) e altura do pulo
+    const crouchDrop = (d.crouch || 0) * this.height * k * 0.18;
+    this.group.position.set(d.x, Math.min(gC, (gB + gF) / 2) - 2 - restDrop - crouchDrop - d.swim * this.height * k * 0.6 + (d.jz || 0), d.y);
+    // no pulo o corpo sobe de nariz e desce de nariz
+    const leapPitch = d.jz > 0 ? clamp((d.vz || 0) / 1400, -0.35, 0.35) : 0;
+    this.group.rotation.set(0, -d.a, this.pitch + leapPitch);
     this.group.scale.setScalar(k);
     // ossos: volta para a pose de descanso, depois animação pronta e camada procedural
     for (const b of Object.values(this.bones)) b.quaternion.copy(b.userData.rest);
@@ -184,8 +188,10 @@ export class RigBody {
       this.rot(b, 'sideAxis', -d.rest * 0.15);
     });
     // pescoço e cabeça: rugido ergue, pastar abaixa, olha em volta parado
-    const roar = d.state === 'roar' ? 1 : 0, eat = d.state === 'eat' ? 1 : 0;
-    const pitchT = roar * 0.35 - eat * 0.45 - d.rest * 0.25 + Math.sin(d.t * 0.7) * 0.03;
+    const roar = d.state === 'roar' && !sp.crouch ? 1 : 0, eat = d.state === 'eat' ? 1 : 0;
+    // rodeando: cabeça baixa e fixa no alvo
+    const stalkHead = d.state === 'stalk' ? -0.15 : 0;
+    const pitchT = roar * 0.35 - eat * 0.45 - d.rest * 0.25 + stalkHead + Math.sin(d.t * 0.7) * 0.03;
     this.look += (pitchT - this.look) * 0.08;
     const yawT = Math.sin(d.t * 0.4 + d.id) * 0.25 * (1 - moving);
     const shake = roar && d.timer < 1.3 && d.timer > 0.2 ? Math.sin(d.t * 34) * 0.06 : 0;

@@ -19,6 +19,7 @@ export class GameCamera {
     this.locked = false;
     this.dragging = false;
     this.sens = 0.0026;
+    this.idle = 9; // segundos sem mexer o mouse (a câmera volta para trás do personagem)
     dom.addEventListener('mousedown', (e) => {
       if (this.mode !== 'terceira') return;
       if (e.button === 2) this.dragging = true;
@@ -32,6 +33,7 @@ export class GameCamera {
     addEventListener('mousemove', (e) => {
       if (this.mode !== 'terceira' || !(this.locked || this.dragging)) return;
       this.yaw += e.movementX * this.sens;
+      this.idle = 0;
       this.pitch = THREE.MathUtils.clamp(this.pitch + e.movementY * this.sens, -0.35, 1.25);
     });
     dom.addEventListener('wheel', (e) => {
@@ -41,6 +43,15 @@ export class GameCamera {
       else this.tactical.dist = THREE.MathUtils.clamp(this.tactical.dist * k, 400, 4000);
     }, { passive: false });
     dom.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  // andando para frente, sem mexer o mouse: a câmera volta devagar para trás do personagem
+  follow(dt, heading, moving) {
+    this.idle += dt;
+    if (this.mode !== 'terceira' || !moving || this.idle < 0.8) return;
+    const d = Math.atan2(Math.sin(heading - this.yaw), Math.cos(heading - this.yaw));
+    if (Math.abs(d) > 1.9) return; // andando de costas/de lado: não gira (evita rodar sem parar)
+    this.yaw += d * (1 - Math.exp(-dt * 1.6));
   }
 
   toggle() {

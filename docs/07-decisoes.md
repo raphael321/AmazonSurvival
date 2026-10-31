@@ -108,3 +108,12 @@ Formato: data · decisão · motivo · alternativas descartadas. Atualize sempre
 - Ordem de corpo: rigado > modelo animado no shader > procedural.
 - Onça-pintada entra como carnívora (ataca), na mata, ~2,4 m.
 - Correções: bípedes com tronco inclinado na pose do modelo são nivelados (excesso de inclinação desfeito, pernas compensadas); inclinação no terreno limitada (±7° bípedes, ±14° quadrúpedes); rugido ergue menos a cabeça. Animais colidem entre si e com troncos e penhascos.
+
+## 2026-10-31 — Mata fechada, caça realista, cachoeira no início, câmera travada
+
+- **Mapa:** antes 41% água e 10% mata. Agora ~12% água e ~84% da terra em mata fechada, pouca rocha (`forestAmount` 0.75, `waterLevel` 0.8, `riverWidth` 0.022, `heightExponent` 1.4, `rockLine` 0.8). Sub-bosque com samambaias e palmeiras nas baixadas. Ajustes salvos antes voltam ao padrão (chave `params:v3`). Névoa úmida mais densa.
+- **Desempenho da mata:** LOD sem contorno de tinta, LOD dos penhascos bem mais leve (~10% dos triângulos, simplificação soldando por posição), distância de desenho menor. Corrigido: moitas e pedras com modelo desenhavam também a versão procedural ("bolas" verdes).
+- **Caça:** carnívoros avisam (rugido / onça encara agachada) → **rodeiam** o jogador a uma distância segura → **investem** (a onça **pula** no bote) → mordem → recuam → rodeiam de novo. Perto do alvo freiam e viram mais rápido. Desistem longe de casa. Animais atravessam água rasa e sobem encostas como o jogador (antes travavam).
+- **Bug:** o 1º quadro tinha tempo negativo e deixava o Amazonssauro "bravo" sem provocação. `dt` agora nunca é negativo.
+- **Cachoeira** (`game3d/src/waterfall.js`): procura um barranco alto (≥170) colado na água perto do início; cortina d'água em arco com faixas descendo, espuma no pé, névoa, pedras emoldurando; zona sem árvores na queda e na vista. O jogador nasce de frente para ela.
+- **Câmera:** travada em 3ª pessoa (visão tática só no F2, para depurar); volta sozinha para trás do personagem ao andar para frente sem mexer o mouse.

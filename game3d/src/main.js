@@ -9,6 +9,7 @@ import { World3D } from './world3d.js';
 import { DEFAULTS3D } from './field.js';
 import { PlayerMesh, CapybaraMesh } from './actors3d.js';
 import { Dinos } from './dinos.js';
+import { Waterfall } from './waterfall.js';
 import { loadRigs } from './rigs.js';
 import { loadModels } from './assets.js';
 import { GameMap } from './map3d.js';
@@ -23,7 +24,7 @@ import { Sky, SKY } from './sky.js';
 // Piloto 3D do Amazon Survival (Three.js). Reaproveita do 2D: gerador Perlin, esqueleto
 // com IK, lógica do jogador e da capivara, HUD. Coordenadas do jogo -> three: (x, z, y).
 
-const STORE = 'amazon-survival-3d:params:v2'; // v2: novos padrões (relevo alto, mata espaçada)
+const STORE = 'amazon-survival-3d:params:v3'; // v3: mata fechada dominante e menos água (ajustes salvos antes voltam ao padrão)
 const loadParams = () => {
   try { return { ...DEFAULTS3D, ...JSON.parse(localStorage.getItem(STORE) || '{}') }; } catch (e) { return { ...DEFAULTS3D }; }
 };
@@ -42,7 +43,7 @@ const hctx = hud.getContext('2d');
 const scene = new THREE.Scene();
 // perspectiva atmosférica: o longe se funde na cor do horizonte do céu
 scene.background = SKY.horizon;
-scene.fog = new THREE.FogExp2(SKY.horizon, 0.00022);
+scene.fog = new THREE.FogExp2(SKY.horizon, 0.00028); // ar úmido da floresta
 
 const hemi = new THREE.HemisphereLight('#e8f0d0', '#4a3a24', 1.4);
 scene.add(hemi);
@@ -65,7 +66,25 @@ const sky = new Sky(scene, SUN_DIR);
 const params = loadParams();
 const world = new World3D(scene, params);
 const input = new Input(renderer.domElement);
-const spawn = world.findSpawn(0, 0);
+// cachoeira perto do começo: o jogador nasce de frente para ela
+const waterfall = new Waterfall(scene, world);
+const wfSite = waterfall.find(0, 0);
+let spawn = null;
+if (wfSite) {
+  waterfall.build(wfSite);
+  world.clearZones = waterfall.clearZones;
+  world.fixed = waterfall.props;
+  world.extras = [...world.fixed];
+  spawn = waterfall.viewpoint();
+}
+if (!spawn) spawn = world.findSpawn(0, 0);
+if (wfSite) {
+  // clareira do ponto inicial até a queda: nada de árvore tampando a vista
+  const tx = waterfall.top[0], ty = waterfall.top[1];
+  for (let k = 0; k <= 6; k++) world.clearZones.push({ x: spawn[0] + (tx - spawn[0]) * (k / 6), y: spawn[1] + (ty - spawn[1]) * (k / 6), r: 170 });
+}
+// começa olhando para a cachoeira
+if (waterfall.top) gameCam.yaw = Math.atan2(waterfall.top[1] - spawn[1], waterfall.top[0] - spawn[0]);
 const player = new Player(...spawn);
 const capy = new Capybara(...world.findSpawn(spawn[0] + 220, spawn[1] + 160));
 player.z = world.groundZ(...spawn);
@@ -78,7 +97,7 @@ capy.height = 52;
 player.swimDepth = -50; // nadando: água no peito
 capy.swimDepth = -22; // capivara nada com o lombo de fora
 // modelos 3D carregam em segundo plano: o mundo abre na hora e eles aparecem ao chegar
-loadModels(window.__ASSET_BASE || '').then((m) => { world.setModels(m); dinos.models = m; world.addShowcase(spawn[0], spawn[1], [0, 2, 3]); }).catch((e) => console.warn('modelos não carregaram', e));
+loadModels(window.__ASSET_BASE || '').then((m) => { world.setModels(m); dinos.models = m; }).catch((e) => console.warn('modelos não carregaram', e));
 const gameMap = new GameMap(world);
 // clima: água com rio correndo, gramado em volta do personagem, traços de vento e fogueira
 const water = new Water(scene, world);
@@ -128,7 +147,7 @@ const rebuild = () => {
     if (!world.isFree(player.x, player.y, 14)) [player.x, player.y] = world.findSpawn(player.x, player.y);
     if (!world.isFree(capy.x, capy.y, 22)) [capy.x, capy.y] = world.findSpawn(player.x + 150, player.y + 150);
     capy.home = [capy.x, capy.y];
-    if (world.pool.models) world.addShowcase(player.x, player.y, [0, 2, 3]);
+    world.extras = [...world.fixed];
     grass.reset();
     water.reset();
   }, 150);
@@ -165,7 +184,8 @@ camF.addButton({ title: 'Copiar JSON' }).on('click', () => navigator.clipboard?.
 pane.hidden = true;
 addEventListener('keydown', (e) => {
   if (e.code === 'Backquote' || e.code === 'F1') { e.preventDefault(); pane.hidden = !pane.hidden; }
-  if (e.code === 'KeyV') gameCam.toggle(); // terceira pessoa <-> visão tática
+  // câmera travada em 3ª pessoa (a visão tática ficou só para depuração: F2)
+  if (e.code === 'F2') gameCam.toggle();
 });
 
 // ---------- tamanho ----------
@@ -298,12 +318,13 @@ function update(dt) {
   else if (world.nearestFruitBush(player.x, player.y, 80)) hint = 'E — colher camu-camu';
   else {
     const d = dinos.nearest(player.x, player.y, 700);
-    if (d) hint = d.state === 'chase' ? `${d.sp.nome} está atacando — corra!` : d.sp.aggressive ? `${d.sp.nome} — carnívoro, fique longe.` : d.angry > 0 ? `${d.sp.nome} está furioso!` : `${d.sp.nome} — herbívoro, só ataca se for atacado.`;
+    if (d) hint = d.state === 'charge' || d.state === 'leap' ? `${d.sp.nome} vai dar o bote — corra!` : d.state === 'stalk' || d.state === 'retreat' ? `${d.sp.nome} está te rodeando...` : d.sp.aggressive ? `${d.sp.nome} — carnívoro, fique longe.` : d.angry > 0 ? `${d.sp.nome} está furioso!` : `${d.sp.nome} — herbívoro, só ataca se for atacado.`;
   }
 
   // câmera 3/4 a 45° (sudeste olhando para noroeste), segue suave
   const fov = gameCam.mode === 'terceira' ? 55 : 32;
   if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
+  gameCam.follow(dt, player.angle, Math.hypot(player.vx || 0, player.vy || 0) > 20);
   gameCam.update(dt, player.x, player.y, player.z, (x, y) => world.groundZ(x, y));
   // árvore entre a câmera e o personagem some (a colisão física continua valendo)
   if (gameCam.mode === 'terceira') {
@@ -315,7 +336,7 @@ function update(dt) {
       const u = Math.max(0, Math.min(1, ((p.x - ax) * (bx - ax) + (p.y - ay) * (by - ay)) / (len * len)));
       if (u > 0.92) continue; // atrás do personagem não atrapalha
       const dd = Math.hypot(p.x - (ax + (bx - ax) * u), p.y - (ay + (by - ay) * u));
-      if (dd < (p.kind === 'samauma' ? 150 : p.kind === 'forest' ? 70 : p.kind === 'cliff' ? p.foot * 0.8 : 30)) hide.add(p.id);
+      if (dd < (p.kind === 'samauma' ? 150 : p.kind === 'forest' ? 170 : p.kind === 'cliff' ? p.foot * 0.8 : 30)) hide.add(p.id);
     }
     world.pool.setHidden(hide);
   } else world.pool.setHidden(new Set());
@@ -325,6 +346,7 @@ function update(dt) {
   sun.target.position.copy(target);
   updateWind(world.time);
   water.update(player.x, player.y);
+  waterfall.update(dt);
   grass.update(player.x, player.y, player.z);
   trails.update(dt, world.time, player.x, player.y);
   fish.update(dt, world.time, player.x, player.y);
@@ -351,7 +373,8 @@ function frame(now) {
   requestAnimationFrame(frame);
   if (!sw || !sh) { last = now; return; }
   try {
-    const dt = Math.min(0.05, (now - last) / 1000);
+    // o relógio do requestAnimationFrame pode começar antes do performance.now(): nunca negativo
+    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
     fpsAcc += now - last;
     fpsN++;
     last = now;
@@ -367,4 +390,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__game = { dinos, fish, gameCam, sky, grass, grassSettings, windSettings, water, trails, campfire, gameMap, world, player, capy, camera, renderer, scene, view, params, get fps() { return fps; } };
+window.__game = { waterfall, dinos, fish, gameCam, sky, grass, grassSettings, windSettings, water, trails, campfire, gameMap, world, player, capy, camera, renderer, scene, view, params, get fps() { return fps; } };

@@ -13,6 +13,8 @@ export class World3D {
     this.time = 0;
     this.picked = new Map();
     this.extras = []; // objetos fora do gerador (ex.: vitrine perto do início)
+    this.fixed = []; // objetos fixos de lugares especiais (pedras da cachoeira)
+    this.clearZones = []; // áreas sem árvores/objetos do gerador (ex.: água da cachoeira)
     this.pool = new PropPool(scene);
     this.bridges = new Bridges(this);
     this.physics = new Physics(this);
@@ -103,9 +105,15 @@ export class World3D {
           if (Math.max(Math.abs(di), Math.abs(dj)) !== r) continue;
           const cx = (i0 + di + 0.5) * T, cy = (j0 + dj + 0.5) * T;
           // chão livre e plano, sem samaúma colada (a câmera em 3ª pessoa precisa de espaço)
-          if (this.isFree(cx, cy, 40) && this.field.slope(cx, cy) < 0.4 && !this.streamer.propsNear(cx, cy, 400).some((p) => (p.kind === 'samauma' && Math.hypot(p.x - cx, p.y - cy) < 260) || (p.kind === 'cliff' && Math.hypot(p.x - cx, p.y - cy) < p.foot + 80))) return [cx, cy];
+          // clareira (fora da mata fechada) para a câmera ter espaço
+          if (this.isFree(cx, cy, 40) && this.field.slope(cx, cy) < 0.4 && (r > 120 || !this.field.forest(cx, cy)) && !this.streamer.propsNear(cx, cy, 400).some((p) => (p.kind === 'samauma' && Math.hypot(p.x - cx, p.y - cy) < 260) || (p.kind === 'cliff' && Math.hypot(p.x - cx, p.y - cy) < p.foot + 80))) return [cx, cy];
         }
     return [x, y];
+  }
+
+  inClearZone(x, y) {
+    for (const z of this.clearZones) if (Math.hypot(x - z.x, y - z.y) < z.r) return true;
+    return false;
   }
 
   setModels(models) {
@@ -156,7 +164,7 @@ export class World3D {
 
   // vitrine: um de cada construção numa fileira à frente do ponto inicial
   addShowcase(x, y, variants) {
-    this.extras = [];
+    this.extras = [...this.fixed];
     variants.forEach((variant, k) => {
       // em diagonal na tela (sudeste no mundo), afastados uns dos outros
       let px = x + 260 + k * 230, py = y + 120 + k * 60;
