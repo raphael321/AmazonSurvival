@@ -67,3 +67,5 @@ Notas de pesquisa:
 - Criaturas domadas têm **lealdade** que cai se maltratadas (liga com o equilíbrio da floresta).
 - Domar não é só "bater até desmaiar": cada uma tem um método próprio (diferencial vs ARK).
 - Primeiro piloto: **capivara** (dócil, Q). MVP: capivara, anta, jacaré (Q, Q, R) para validar os três esqueletos de chão.
+
+> **No jogo (3D):** Amazonssauro, Pycnonemosaurus e Oxalaia já estão no mundo (`game3d/src/dinos.js`). Ainda faltam domar, montar e o evento de chefe do Oxalaia na cheia.

@@ -80,3 +80,11 @@ Formato: data · decisão · motivo · alternativas descartadas. Atualize sempre
 
 - Rios com **cor real**: água branca (barrenta) e água preta (chá), por bacia, com fronteira nítida tipo Encontro das Águas. O azul aprovado antes continua disponível no painel ("água real" = 0).
 - Sub-bosque sem capim e com chão de folhas; várzea pintada junto da água; açaí e samaúma concentrados perto dos rios.
+
+## 2026-10-31 — Dinossauros no 3D (Ecos do Cretáceo)
+
+- `game3d/src/dinos.js`: Amazonssauro, Pycnonemosaurus e Oxalaia desenhados por código (esqueleto procedural: coluna em corrente, pernas com IK de dois ossos + metatarso, passo com pé no chão). Proporções e cores tiradas das fichas em `refs/CRIATURAS/`.
+- Todas as peças de todos os dinos em 2 malhas instanciadas com cor por instância (+ contorno): poucas chamadas de desenho.
+- Comportamento: Amazonssauro manso (anda, empina para comer, deita, se afasta do jogador); Pycnonemosaurus na mata e Oxalaia na margem/rio (nada): rugem antes de atacar (aviso justo), perseguem por pouco tempo e mordem (dano e empurrão). Sem vida, o jogador acorda no acampamento; a vida volta devagar.
+- População: um de cada perto do início; depois o jogo mantém até 3 amazonssauros, 1 pycno e 1 oxalaia em volta do jogador. Painel: "dinossauros" liga/desliga.
+- A cor da água agora fica salva junto com os outros ajustes (sem botão de salvar: tudo grava sozinho).

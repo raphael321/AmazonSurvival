@@ -8,6 +8,7 @@ import { Popups, drawHeart } from '../../game/src/art/fx.js';
 import { World3D } from './world3d.js';
 import { DEFAULTS3D } from './field.js';
 import { PlayerMesh, CapybaraMesh } from './actors3d.js';
+import { Dinos } from './dinos.js';
 import { loadModels } from './assets.js';
 import { GameMap } from './map3d.js';
 import { updateWind, windSettings } from './wind.js';
@@ -88,6 +89,9 @@ const campfire = new Campfire(scene, world, fireSpot[0], fireSpot[1]);
 const playerMesh = new PlayerMesh(scene);
 const capyMesh = new CapybaraMesh(scene);
 const popups = new Popups();
+// dinossauros (Ecos do Cretáceo): um de cada perto do começo, depois a população se mantém em volta
+const dinos = new Dinos(scene, world);
+dinos.showcase(spawn[0], spawn[1]);
 const view = { distance: 1150, pitch: 38, fly: false, shadows: true };
 
 // ---------- painel (Tweakpane) ----------
@@ -144,7 +148,11 @@ const camF = pane.addFolder({ title: 'Câmera e mundo', expanded: false });
 camF.addBinding(gameCam, 'dist', { label: 'distância (3ª pessoa)', min: 160, max: 1200, step: 10 });
 camF.addBinding(gameCam, 'sens', { label: 'sensibilidade do mouse', min: 0.0008, max: 0.006, step: 0.0001 });
 camF.addBinding(scene.fog, 'density', { label: 'névoa', min: 0, max: 0.0008, step: 0.00001 });
-camF.addBinding(water.uniforms.uFiel, 'value', { label: 'água real (0 = azul)', min: 0, max: 1, step: 0.05 });
+camF.addBinding(dinos, 'enabled', { label: 'dinossauros' });
+// cor da água fica salva junto com os outros ajustes (sem botão: grava sozinho ao mudar)
+if (params.aguaReal === undefined) params.aguaReal = 1;
+water.uniforms.uFiel.value = params.aguaReal;
+camF.addBinding(params, 'aguaReal', { label: 'água real (0 = azul)', min: 0, max: 1, step: 0.05 }).on('change', (e) => { water.uniforms.uFiel.value = e.value; saveParams(params); });
 camF.addBinding(view, 'fly', { label: 'modo voo' });
 camF.addBinding(view, 'shadows', { label: 'sombras' }).on('change', () => { sun.castShadow = view.shadows; });
 camF.addBinding(params, 'seed', { label: 'seed', min: 1, max: 99999, step: 1 }).on('change', rebuild);
@@ -246,6 +254,25 @@ function update(dt) {
   // golpe: na 3ª pessoa vai para onde a câmera olha; na tática, para o mouse
   player.update(dt, wrapInput, world, gameCam.mode === 'terceira' ? gameCam.aim(player.x, player.y) : aimAtMouse(), onStrike);
   capy.update(dt, world, player);
+  const dinoEvents = [];
+  dinos.update(dt, player, dinoEvents);
+  for (const ev of dinoEvents) {
+    // mordida: dano e empurrão; sem vida, acorda de volta no acampamento
+    const d = ev.dino, s = toScreen(player.x, player.y, player.z + 95);
+    player.hp = Math.max(0, player.hp - d.sp.bite);
+    const kx = player.x - d.x, ky = player.y - d.y, kl = Math.hypot(kx, ky) || 1;
+    for (let k = 0; k < 6; k++) { const px = player.x, py = player.y; player.x += (kx / kl) * 14; player.y += (ky / kl) * 14; world.resolve(player, 14, px, py); }
+    popups.add(s[0], s[1], `-${d.sp.bite} ${d.sp.nome}!`, { color: '#e2553d' });
+    if (player.hp <= 0) {
+      [player.x, player.y] = world.findSpawn(fireSpot[0] + 80, fireSpot[1]);
+      player.z = world.groundZ(player.x, player.y);
+      player.hp = player.maxHp;
+      const t = toScreen(player.x, player.y, player.z + 95);
+      popups.add(t[0], t[1], 'Você desmaiou e acordou no acampamento', { color: '#f29a4b', life: 3 });
+    }
+  }
+  // vida volta devagar
+  player.hp = Math.min(player.maxHp, player.hp + dt * 1.5);
   if (input.hit('KeyE')) interact();
   popups.update(dt);
 
@@ -253,6 +280,10 @@ function update(dt) {
   hint = '';
   if (dCapy < 85 && capy.state !== 'flee') hint = capy.tamed ? 'E — fazer carinho' : player.fruits > 0 ? 'E — oferecer camu-camu' : 'Você precisa de camu-camu (moitas com frutinhas vermelhas)';
   else if (world.nearestFruitBush(player.x, player.y, 80)) hint = 'E — colher camu-camu';
+  else {
+    const d = dinos.nearest(player.x, player.y, 700);
+    if (d) hint = d.sp.aggressive ? `${d.sp.nome} — cuidado! ${d.state === 'chase' ? 'Corra!' : 'Fique longe.'}` : `${d.sp.nome} — manso. Não chegue muito perto.`;
+  }
 
   // câmera 3/4 a 45° (sudeste olhando para noroeste), segue suave
   const fov = gameCam.mode === 'terceira' ? 55 : 32;
@@ -320,4 +351,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__game = { fish, gameCam, sky, grass, grassSettings, windSettings, water, trails, campfire, gameMap, world, player, capy, camera, renderer, scene, view, params, get fps() { return fps; } };
+window.__game = { dinos, fish, gameCam, sky, grass, grassSettings, windSettings, water, trails, campfire, gameMap, world, player, capy, camera, renderer, scene, view, params, get fps() { return fps; } };
