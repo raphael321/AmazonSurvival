@@ -25,7 +25,7 @@ Leia antes de qualquer trabalho grande:
 
 ## Stack e regras técnicas
 
-> **Atualização 2026-10-31:** o Raphael aprovou um **piloto 3D em Three.js** em `game3d/` (ver `docs/07-decisoes.md`). As regras abaixo valem para o piloto 2D em `game/`; no 3D usamos Three.js (WebGL), objetos/terreno gerados por código e, quando ele trouxer, modelos próprios em .glb leves. Alvo: navegador e Steam (Electron + steamworks.js).
+> **Atualização 2026-10-31:** decidido: **o jogo é 3D em Three.js**, em `game3d/` (ver `docs/07-decisoes.md`). As regras abaixo valem para o piloto 2D em `game/`; no 3D usamos Three.js (WebGL), objetos/terreno gerados por código e, quando ele trouxer, modelos próprios em .glb leves. Alvo: navegador e Steam (Electron + steamworks.js).
 
 ### Piloto 2D (`game/`)
 

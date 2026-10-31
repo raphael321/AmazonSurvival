@@ -34,6 +34,7 @@ Formato: data · decisão · motivo · alternativas descartadas. Atualize sempre
 | 2026-10-31 | **Piloto 3D em Three.js** (`game3d/`), ao lado do 2D. Reaproveita sem cópia: gerador Perlin, esqueleto/IK (agora com pés apoiados no relevo), lógica do jogador e da capivara, HUD. Terreno contínuo em chunks com streaming, objetos low-poly por código em InstancedMesh com contorno, toon de 3 tons, sol com sombra, neblina, painel Tweakpane | Raphael vai produzir coisas em 3D; Three.js abre na hora no navegador e eu consigo testar sozinho | Godot (export web pesado, editor que eu não opero) |
 | 2026-10-31 | Steam: empacotar o mesmo build web com **Electron** (ou Tauri) + **steamworks.js** (conquistas, nuvem) | Um código só para navegador e desktop | Reescrever em engine nativa |
 | 2026-10-31 | Bibliotecas: three, tweakpane, esbuild (build). Depois, sob demanda: gltf-transform (comprimir modelos), postprocessing (contorno/bloom/raios), three-mesh-bvh (colisão em modelos), Rapier (física), Colyseus/ws (multiplayer). Sem React Three Fiber por enquanto | Leves e focadas; cada uma entra só quando o jogo pedir | Engine/framework completo agora |
+| 2026-10-31 | **O jogo será em 3D (Three.js).** `game3d/` passa a ser o jogo principal; `game/` (2D) fica como referência e fonte dos módulos compartilhados (gerador, esqueleto, entidades) até a migração completa | Raphael aprovou o piloto 3D: "bem melhor em 3D, será assim" | Seguir no Canvas 2D |
 
 ## Dúvidas em aberto
 
