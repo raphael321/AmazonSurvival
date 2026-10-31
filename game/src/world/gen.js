@@ -33,7 +33,7 @@ export const DEFAULTS = {
   camu: 0.15,
   rock: 0.012,
   samauma: 0.0015,
-  forestTrees: 0.4,
+  forestTrees: 0.16,
   // câmera e desempenho
   zoom: 1,
   loadRadius: 1,
@@ -172,7 +172,8 @@ export class Gen {
         const px = (i + 0.5 + jx) * T, py = (j + 0.5 + jy) * T;
         const id = i + ',' + j;
         if (this.isForest(i, j)) {
-          if (r < p.forestTrees) out.push({ id, kind: 'forest', x: px, y: py, z, variant: Math.floor(v * 6), shadow: 24 });
+          // no máximo uma árvore por casa escura de um tabuleiro: sempre sobra passagem entre troncos
+          if ((i + j) % 2 === 0 && r < p.forestTrees * 2) out.push({ id, kind: 'forest', x: px, y: py, z, variant: Math.floor(v * 6), shadow: 24 });
           continue;
         }
         if (rocky) {

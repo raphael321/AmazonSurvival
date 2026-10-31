@@ -14,11 +14,14 @@ import { updateWind, windSettings } from './wind.js';
 import { Grass, grassSettings } from './grass.js';
 import { Water } from './water.js';
 import { WindTrails, Campfire } from './fx3d.js';
+import { GameCamera } from './camera3d.js';
+import { Fish } from './fish.js';
+import { Sky, SKY } from './sky.js';
 
 // Piloto 3D do Amazon Survival (Three.js). Reaproveita do 2D: gerador Perlin, esqueleto
 // com IK, lógica do jogador e da capivara, HUD. Coordenadas do jogo -> three: (x, z, y).
 
-const STORE = 'amazon-survival-3d:params:v1';
+const STORE = 'amazon-survival-3d:params:v2'; // v2: novos padrões (relevo alto, mata espaçada)
 const loadParams = () => {
   try { return { ...DEFAULTS3D, ...JSON.parse(localStorage.getItem(STORE) || '{}') }; } catch (e) { return { ...DEFAULTS3D }; }
 };
@@ -34,10 +37,10 @@ host.appendChild(renderer.domElement);
 const hud = document.getElementById('hud');
 const hctx = hud.getContext('2d');
 
-const SKY = new THREE.Color('#aab98c');
 const scene = new THREE.Scene();
-scene.background = SKY;
-scene.fog = new THREE.Fog(SKY, 1400, 3600);
+// perspectiva atmosférica: o longe se funde na cor do horizonte do céu
+scene.background = SKY.horizon;
+scene.fog = new THREE.FogExp2(SKY.horizon, 0.00022);
 
 const hemi = new THREE.HemisphereLight('#e8f0d0', '#4a3a24', 1.4);
 scene.add(hemi);
@@ -52,7 +55,9 @@ scene.add(sun, sun.target);
 const SUN_DIR = new THREE.Vector3(-0.85, 1.1, -0.15).normalize();
 
 
-const camera = new THREE.PerspectiveCamera(32, 1, 10, 9000);
+const camera = new THREE.PerspectiveCamera(55, 1, 5, 14000);
+const gameCam = new GameCamera(camera, renderer.domElement);
+const sky = new Sky(scene, SUN_DIR);
 
 // ---------- mundo e entidades ----------
 const params = loadParams();
@@ -75,6 +80,7 @@ const gameMap = new GameMap(world);
 const water = new Water(scene, world);
 const grass = new Grass(scene, world);
 const trails = new WindTrails(scene, world);
+const fish = new Fish(scene, world);
 const fireSpot = world.findSpawn(spawn[0] - 220, spawn[1] + 120);
 const campfire = new Campfire(scene, world, fireSpot[0], fireSpot[1]);
 const playerMesh = new PlayerMesh(scene);
@@ -129,12 +135,13 @@ const windF = pane.addFolder({ title: 'Vento e grama', expanded: false });
 windF.addBinding(windSettings, 'strength', { label: 'força do vento', min: 0, max: 2.5, step: 0.05 });
 windF.addBinding(windSettings, 'direction', { label: 'direção (°)', min: 0, max: 360, step: 1 });
 windF.addBinding(windSettings, 'gust', { label: 'rajadas', min: 0, max: 1, step: 0.05 });
-windF.addBinding(grassSettings, 'radius', { label: 'raio da grama', min: 250, max: 1200, step: 10 });
+windF.addBinding(grassSettings, 'radius', { label: 'raio da grama', min: 250, max: 1600, step: 10 });
 windF.addBinding(grassSettings, 'density', { label: 'densidade', min: 0, max: 2, step: 0.05 }).on('change', () => grass.reset());
 windF.addBinding(grassSettings, 'height', { label: 'altura', min: 0.3, max: 2, step: 0.05 });
 const camF = pane.addFolder({ title: 'Câmera e mundo', expanded: false });
-camF.addBinding(view, 'distance', { label: 'distância', min: 400, max: 4000, step: 10 });
-camF.addBinding(view, 'pitch', { label: 'inclinação', min: 15, max: 80, step: 1 });
+camF.addBinding(gameCam, 'dist', { label: 'distância (3ª pessoa)', min: 160, max: 1200, step: 10 });
+camF.addBinding(gameCam, 'sens', { label: 'sensibilidade do mouse', min: 0.0008, max: 0.006, step: 0.0001 });
+camF.addBinding(scene.fog, 'density', { label: 'névoa', min: 0, max: 0.0008, step: 0.00001 });
 camF.addBinding(view, 'fly', { label: 'modo voo' });
 camF.addBinding(view, 'shadows', { label: 'sombras' }).on('change', () => { sun.castShadow = view.shadows; });
 camF.addBinding(params, 'seed', { label: 'seed', min: 1, max: 99999, step: 1 }).on('change', rebuild);
@@ -144,12 +151,8 @@ camF.addButton({ title: 'Copiar JSON' }).on('click', () => navigator.clipboard?.
 pane.hidden = true;
 addEventListener('keydown', (e) => {
   if (e.code === 'Backquote' || e.code === 'F1') { e.preventDefault(); pane.hidden = !pane.hidden; }
+  if (e.code === 'KeyV') gameCam.toggle(); // terceira pessoa <-> visão tática
 });
-renderer.domElement.addEventListener('wheel', (e) => {
-  e.preventDefault();
-  view.distance = Math.max(400, Math.min(4000, view.distance * (1 + Math.sign(e.deltaY) * 0.1)));
-  pane.refresh();
-}, { passive: false });
 
 // ---------- tamanho ----------
 let sw = 0, sh = 0;
@@ -222,14 +225,23 @@ const wrapInput = {
   get clicked() { return input.clicked; },
   down: (...c) => input.down(...c),
   hit: (...c) => input.hit(...c),
-  axis: () => input.axis(),
+  // WASD relativo à câmera: W anda para onde a câmera olha. O Player converte "direção de tela"
+  // pela projeção isométrica; aqui entregamos a direção já invertida dessa conversão.
+  axis: () => {
+    const [ax, ay] = input.axis();
+    if (!ax && !ay) return [0, 0];
+    const { fwd, right } = gameCam.basis();
+    const wx = fwd[0] * -ay + right[0] * ax, wy = fwd[1] * -ay + right[1] * ax;
+    return [(wx - wy) * 0.7071, (wx + wy) * 0.41];
+  },
 };
 
 function update(dt) {
   player.noclip = view.fly;
   player.speedMul = view.fly ? 4 : 1;
   world.update(dt, player.x, player.y);
-  player.update(dt, wrapInput, world, aimAtMouse(), onStrike);
+  // golpe: na 3ª pessoa vai para onde a câmera olha; na tática, para o mouse
+  player.update(dt, wrapInput, world, gameCam.mode === 'terceira' ? gameCam.aim(player.x, player.y) : aimAtMouse(), onStrike);
   capy.update(dt, world, player);
   if (input.hit('KeyE')) interact();
   popups.update(dt);
@@ -240,18 +252,32 @@ function update(dt) {
   else if (world.nearestFruitBush(player.x, player.y, 80)) hint = 'E — colher camu-camu';
 
   // câmera 3/4 a 45° (sudeste olhando para noroeste), segue suave
-  target.lerp(new THREE.Vector3(player.x, player.z + 40, player.y), 1 - Math.exp(-dt * 6));
-  const p = THREE.MathUtils.degToRad(view.pitch), D = view.distance;
-  camera.position.set(target.x + Math.cos(p) * D * 0.7071, target.y + Math.sin(p) * D, target.z + Math.cos(p) * D * 0.7071);
-  camera.lookAt(target);
-  scene.fog.near = D * 1.1;
-  scene.fog.far = D * 3.2;
+  const fov = gameCam.mode === 'terceira' ? 55 : 32;
+  if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
+  gameCam.update(dt, player.x, player.y, player.z, (x, y) => world.groundZ(x, y));
+  // árvore entre a câmera e o personagem some (a colisão física continua valendo)
+  if (gameCam.mode === 'terceira') {
+    const ax = camera.position.x, ay = camera.position.z, bx = player.x, by = player.y;
+    const len = Math.hypot(bx - ax, by - ay) || 1;
+    const hide = new Set();
+    for (const p of world.streamer.propsNear((ax + bx) / 2, (ay + by) / 2, len / 2 + 120)) {
+      if (p.kind !== 'samauma' && p.kind !== 'acai' && p.kind !== 'forest') continue;
+      const u = Math.max(0, Math.min(1, ((p.x - ax) * (bx - ax) + (p.y - ay) * (by - ay)) / (len * len)));
+      if (u > 0.92) continue; // atrás do personagem não atrapalha
+      const dd = Math.hypot(p.x - (ax + (bx - ax) * u), p.y - (ay + (by - ay) * u));
+      if (dd < (p.kind === 'samauma' ? 150 : p.kind === 'forest' ? 70 : 30)) hide.add(p.id);
+    }
+    world.pool.setHidden(hide);
+  } else world.pool.setHidden(new Set());
+  target.copy(gameCam.target);
+  sky.update(world.time, camera);
   sun.position.copy(target).addScaledVector(SUN_DIR, 1800);
   sun.target.position.copy(target);
   updateWind(world.time);
   water.update(player.x, player.y);
   grass.update(player.x, player.y, player.z);
   trails.update(dt, world.time, player.x, player.y);
+  fish.update(dt, world.time, player.x, player.y);
   campfire.update(dt, world.time, camera, sh);
   playerMesh.update(player);
   capyMesh.update(capy);
@@ -291,4 +317,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__game = { grass, grassSettings, windSettings, water, trails, campfire, gameMap, world, player, capy, camera, renderer, scene, view, params, get fps() { return fps; } };
+window.__game = { fish, gameCam, sky, grass, grassSettings, windSettings, water, trails, campfire, gameMap, world, player, capy, camera, renderer, scene, view, params, get fps() { return fps; } };

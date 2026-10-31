@@ -256,6 +256,8 @@ export class PropPool {
         p.collider = 0;
       } else if (SOLID.has(got.name) && !p.collider) p.collider = Math.max(got.m.size.x, got.m.size.z) * got.m.scale * v * 0.35;
     } else if (p.kind === 'samauma' || p.kind === 'forest') { push('forestTrunk', v); push('forestCanopy', v); }
+    // árvores da mata: colisão só no tronco, para dar para andar entre elas
+    if (p.kind === 'forest' && !p.collider) p.collider = 20 * v;
     else if (p.kind === 'bush') push('bush', 0.85 + (p.variant % 3) * 0.15);
     else if (p.kind === 'rock') push('rock', p.size || 1);
     // frutinhas procedurais só enquanto os modelos não chegaram
@@ -263,11 +265,21 @@ export class PropPool {
   }
 
   // refaz todas as instâncias a partir dos objetos carregados (só quando algo muda)
+  // objetos escondidos (ex.: árvore entre a câmera e o personagem)
+  setHidden(ids) {
+    const old = this.hidden || new Set();
+    if (ids.size === old.size && [...ids].every((i) => old.has(i))) return;
+    this.hidden = ids;
+    this.dirty = true;
+  }
+
   rebuild(allProps, cx, cy) {
     const buckets = new Map();
+    const hidden = this.hidden || new Set();
     const parts = [];
     this.center = [cx, cy];
     for (const p of allProps) {
+      if (hidden.has(p.id)) continue;
       const d = Math.hypot(p.x - cx, p.y - cy);
       if (d > FAR.big) continue;
       parts.length = 0;

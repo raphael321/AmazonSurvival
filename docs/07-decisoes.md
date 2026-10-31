@@ -49,6 +49,12 @@ Formato: data · decisão · motivo · alternativas descartadas. Atualize sempre
 | 2026-10-31 | **Árvores e moitas balançam** por patch de shader (deslocamento ∝ altura², com tremor); o contorno de tinta usa o mesmo patch; pedras, troncos e construções ficam firmes | Vento visível na mata sem custo de CPU | Animação por esqueleto nas árvores |
 | 2026-10-31 | **Água azul com rio correndo**: shader com mapa de profundidade + direção do fluxo (tangente ao traçado do ruído de rio), flowmap de duas fases, raso claro/fundo escuro, espuma branca na margem, brilhos que correm com o fluxo; mapa refeito em fatias | Pedido do Raphael (água azul, rio passando) | Plano de cor única |
 | 2026-10-31 | **Traços brancos do vento** (fitas estilizadas que seguem o campo com volteios de ruído) e **fogueira com fumaça** levada pelo vento | Pedido: "partes brancas do vento, na fumaça" | — |
+| 2026-10-31 | **Câmera em terceira pessoa** como padrão (referência: vídeo enviado pelo Raphael, câmera de aventura em mundo aberto): atrás e baixa, girada pelo mouse (clique trava; Esc solta; botão direito arrasta), roda = distância, não entra no terreno; WASD relativo à câmera; **V** alterna para a visão tática de cima | Pedido do Raphael | Só a visão tática |
+| 2026-10-31 | **Árvore entre a câmera e o personagem some** (volta quando sai da linha de visão; a colisão continua); spawn longe de samaúma | Câmera aproximando colava no tronco/sapopemas | Aproximar a câmera do tronco |
+| 2026-10-31 | **Céu** (gradiente, sol com halo, nuvens de ruído), **névoa exponencial** com a cor do horizonte, terreno até 6 chunks com **LOD** (48/24/12) e **saias** contra frestas; objetos só nos chunks próximos; relevo padrão 1,8× mais alto | Vistas longas com verticalidade sem custo alto | Raio curto sem horizonte |
+| 2026-10-31 | Vento mais calmo e natural (rajadas largas e lentas, tremor leve); grama com raio maior (1150) e densidade que cai com a distância | Feedback: "movimentando demais", "raio da grama feio" | — |
+| 2026-10-31 | **Mata fechada andável**: só troncos colidem; árvores espaçadas (no máximo uma por casa de tabuleiro); parâmetros salvos passam para v2 | Feedback: "árvores muito próximas, não dá para passar" | Mata bloqueada |
+| 2026-10-31 | **Peixes no rio**: cardumes pequenos (dourados) e pirarucus raros, a favor da correnteza, só em água funda, saltos com respingo; cauda ondulando no shader | Pedido do Raphael | — |
 
 ## Dúvidas em aberto
 

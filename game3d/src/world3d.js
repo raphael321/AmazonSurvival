@@ -44,8 +44,7 @@ export class World3D {
   // terreno pisável (a ponte e outras malhas entram pela física em resolve)
   walkable(x, y) {
     const h = this.field.H(x, y);
-    if (h < -6) return false; // água funda
-    if (this.field.forest(x, y)) return false; // mata fechada
+    if (h < -6) return false; // água funda (mata fechada é andável: só os troncos colidem)
     return this.field.slope(x, y) <= this.params.maxSlope;
   }
 
@@ -94,7 +93,8 @@ export class World3D {
         for (let di = -r; di <= r; di++) {
           if (Math.max(Math.abs(di), Math.abs(dj)) !== r) continue;
           const cx = (i0 + di + 0.5) * T, cy = (j0 + dj + 0.5) * T;
-          if (this.isFree(cx, cy, 40) && this.field.slope(cx, cy) < 0.4) return [cx, cy];
+          // chão livre e plano, sem samaúma colada (a câmera em 3ª pessoa precisa de espaço)
+          if (this.isFree(cx, cy, 40) && this.field.slope(cx, cy) < 0.4 && !this.streamer.propsNear(cx, cy, 260).some((p) => p.kind === 'samauma' && Math.hypot(p.x - cx, p.y - cy) < 260)) return [cx, cy];
         }
     return [x, y];
   }
@@ -121,6 +121,7 @@ export class World3D {
       all.push(...this.extras);
       // pontes dos chunks carregados
       for (const c of this.streamer.chunks.values()) {
+        if (c.lod >= 2) continue; // chunks distantes: só relevo
         const b = this.bridges.forChunk(c.i, c.j);
         if (b) all.push(b.prop || (b.prop = { id: b.id, kind: 'bridge', x: b.x, y: b.y, z: b.deckZ, bridge: b }));
       }

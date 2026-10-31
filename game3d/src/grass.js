@@ -10,7 +10,7 @@ import { rng } from '../../game/src/engine/math.js';
 const CELL = 128;
 const PER_CELL = 260; // folhas por célula (densidade 1)
 
-export const grassSettings = { radius: 760, density: 1, height: 1 };
+export const grassSettings = { radius: 1150, density: 1, height: 1 };
 
 const VERT = /* glsl */ `
 #include <common>
@@ -28,13 +28,17 @@ void main() {
   float t = position.y;
   // some suave na borda do círculo em volta do personagem
   float d = length(aOffset.xz - uPlayer.xz);
-  float edge = 1.0 - smoothstep(uRadius * 0.72, uRadius, d);
-  float h = aParams.y * uHeight * edge;
+  float edge = 1.0 - smoothstep(uRadius * 0.8, uRadius, d);
+  // densidade cai com a distância: longe, metade das folhas some (custo menor, mesmo tapete)
+  float thin = step(fract(aParams.z * 7.31), 1.0 - 0.55 * smoothstep(uRadius * 0.35, uRadius * 0.8, d));
+  float h = aParams.y * uHeight * edge * thin;
   vec3 p = vec3(position.x * c, t * h, position.x * s);
   // vento: dobra mais na ponta (t²), com tremor rápido
+  // vento calmo: ondas largas que passam pelo campo + tremor leve
   vec2 w = windAt(aOffset.xz);
-  float flutter = wNoise(aOffset.xz * 0.045 + vec2(uTime * 2.3, uTime * 1.7)) * 0.4;
-  vec2 bend = w * (1.0 + flutter) * t * t * h * 0.75;
+  float wave = wNoise(aOffset.xz * 0.0035 - uWindDir * uTime * 0.6);
+  float flutter = wNoise(aOffset.xz * 0.02 + vec2(uTime * 0.9, uTime * 0.7)) * 0.12;
+  vec2 bend = w * (0.55 + 0.45 * wave + flutter) * t * t * h * 0.38;
   // o personagem abre caminho
   vec2 away = aOffset.xz - uPlayer.xz;
   bend += normalize(away + 0.001) * smoothstep(55.0, 0.0, length(away)) * 22.0 * t;
@@ -78,7 +82,7 @@ export class Grass {
   constructor(scene, world) {
     this.world = world;
     // vagas suficientes para o raio máximo do painel (1200)
-    const maxCells = Math.ceil(((1200 + CELL) * 2 / CELL + 1) ** 2);
+    const maxCells = Math.ceil(((1600 + CELL) * 2 / CELL + 1) ** 2);
     this.slots = maxCells;
     this.cap = maxCells * PER_CELL * 2; // até densidade 2
     this.perSlot = PER_CELL * 2;

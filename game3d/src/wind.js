@@ -12,7 +12,7 @@ export const windUniforms = {
   uWindStr: { value: 1 },
 };
 
-export const windSettings = { strength: 1, direction: 35, gust: 0.45 };
+export const windSettings = { strength: 0.8, direction: 35, gust: 0.35 };
 
 // Perlin 2D clássico (Stefan Gustavson) em GLSL, com nomes prefixados para não colidir.
 export const WIND_GLSL = /* glsl */ `
@@ -40,9 +40,10 @@ float wNoise(vec2 P) {
   return 2.3 * mix(nx.x, nx.y, f.y);
 }
 // vento no ponto (vetor no plano xz): direção global × força com rajadas que viajam
+// rajadas largas e lentas: faixas grandes de ruído que atravessam o campo devagar
 vec2 windAt(vec2 p) {
-  float g = wNoise(p * 0.0016 - uWindDir * uTime * 0.32);
-  return uWindDir * uWindStr * (0.62 + 0.55 * g);
+  float g = wNoise(p * 0.0009 - uWindDir * uTime * 0.14);
+  return uWindDir * uWindStr * (0.5 + 0.5 * g);
 }
 `;
 
@@ -58,8 +59,8 @@ vec4 wpos = vec4(transformed, 1.0);
 wpos = modelMatrix * wpos;
 float swH = max(0.0, wpos.y - worg.y);
 vec2 swW = windAt(worg.xz);
-float swF = wNoise(worg.xz * 0.013 + vec2(uTime * 1.9, uTime * 1.3));
-wpos.xz += swW * (16.0 * pow(swH / 300.0, 2.0) + 0.06 * swH) * (1.0 + 0.35 * swF);
+float swF = wNoise(worg.xz * 0.013 + vec2(uTime * 0.8, uTime * 0.6));
+wpos.xz += swW * (9.0 * pow(swH / 300.0, 2.0) + 0.035 * swH) * (1.0 + 0.2 * swF);
 vec4 mvPosition = viewMatrix * wpos;
 gl_Position = projectionMatrix * mvPosition;
 `;
@@ -84,8 +85,8 @@ export function swaying(material) {
 const perlin = makePerlin(4242);
 export function windAt(x, y, t) {
   const d = windUniforms.uWindDir.value, s = windUniforms.uWindStr.value;
-  const g = perlin.noise(x * 0.0016 - d.x * t * 0.32, y * 0.0016 - d.y * t * 0.32);
-  const k = s * (0.62 + 0.55 * g);
+  const g = perlin.noise(x * 0.0009 - d.x * t * 0.14, y * 0.0009 - d.y * t * 0.14);
+  const k = s * (0.5 + 0.5 * g);
   return [d.x * k, d.y * k];
 }
 
@@ -93,7 +94,7 @@ export function windAt(x, y, t) {
 export function updateWind(t) {
   windUniforms.uTime.value = t;
   const base = THREE.MathUtils.degToRad(windSettings.direction);
-  const a = base + perlin.noise(t * 0.03, 7.3) * 0.6;
+  const a = base + perlin.noise(t * 0.02, 7.3) * 0.45;
   windUniforms.uWindDir.value.set(Math.cos(a), Math.sin(a));
-  windUniforms.uWindStr.value = windSettings.strength * (1 - windSettings.gust * 0.5 + windSettings.gust * 0.5 * (perlin.noise(t * 0.17, 3.1) + 1));
+  windUniforms.uWindStr.value = windSettings.strength * (1 - windSettings.gust * 0.5 + windSettings.gust * 0.5 * (perlin.noise(t * 0.08, 3.1) + 1));
 }

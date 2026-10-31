@@ -6,7 +6,9 @@ import { buildProps } from './props3d.js';
 // Terreno 3D em chunks (um chunk = um bloco do gerador = 16×16 tiles = 1024 unidades).
 // Coordenadas: jogo (x, y sul, z cima) -> three (x, z, y).
 export const CHUNK = BLOCK * T;
-const SEG = 48;
+// detalhe da malha por distância (em chunks): perto 48, média 24, longe 12
+const LOD_SEG = [48, 24, 12];
+const lodFor = (d) => (d <= 1.6 ? 0 : d <= 3.6 ? 1 : 2);
 
 const terrainMat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonRamp() });
 
@@ -19,7 +21,7 @@ function hash(x, y) {
   return s - Math.floor(s);
 }
 
-function buildChunkGeometry(field, cx, cy) {
+function buildChunkGeometry(field, cx, cy, SEG) {
   const n = SEG + 1, step = CHUNK / SEG;
   const pos = new Float32Array(n * n * 3), nor = new Float32Array(n * n * 3), col = new Float32Array(n * n * 3);
   const rockH = field.rockH;
@@ -52,8 +54,29 @@ function buildChunkGeometry(field, cx, cy) {
       col[k * 3 + 1] = c.g * v;
       col[k * 3 + 2] = c.b * v;
     }
-  const idx = new Uint32Array(SEG * SEG * 6);
+  // saias: uma borda vertical abaixo dos quatro lados esconde frestas entre níveis de detalhe
+  const edge = [];
+  for (let i = 0; i < n; i++) edge.push(i); // norte
+  for (let j = 1; j < n; j++) edge.push(j * n + n - 1); // leste
+  for (let i = n - 2; i >= 0; i--) edge.push((n - 1) * n + i); // sul
+  for (let j = n - 2; j >= 1; j--) edge.push(j * n); // oeste
+  const base = n * n, ne = edge.length;
+  const P = new Float32Array((base + ne) * 3), N = new Float32Array((base + ne) * 3), C = new Float32Array((base + ne) * 3);
+  P.set(pos); N.set(nor); C.set(col);
+  edge.forEach((v, k) => {
+    const o = (base + k) * 3;
+    P[o] = pos[v * 3]; P[o + 1] = pos[v * 3 + 1] - 60; P[o + 2] = pos[v * 3 + 2];
+    N[o] = nor[v * 3]; N[o + 1] = nor[v * 3 + 1]; N[o + 2] = nor[v * 3 + 2];
+    C[o] = col[v * 3]; C[o + 1] = col[v * 3 + 1]; C[o + 2] = col[v * 3 + 2];
+  });
+  const idx = new Uint32Array(SEG * SEG * 6 + ne * 6);
   let t = 0;
+  for (let k = 0; k < ne; k++) {
+    const a = edge[k], b = edge[(k + 1) % ne], a2 = base + k, b2 = base + ((k + 1) % ne);
+    // dupla face (não importa a ordem): a saia aparece de qualquer lado
+    idx[t++] = a; idx[t++] = b; idx[t++] = a2;
+    idx[t++] = b; idx[t++] = b2; idx[t++] = a2;
+  }
   for (let j = 0; j < SEG; j++)
     for (let i = 0; i < SEG; i++) {
       const a = j * n + i, b = a + 1, d = a + n, e = d + 1;
@@ -62,9 +85,9 @@ function buildChunkGeometry(field, cx, cy) {
       idx[t++] = b; idx[t++] = d; idx[t++] = e;
     }
   const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.setAttribute('position', new THREE.BufferAttribute(P, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(C, 3));
   g.setIndex(new THREE.BufferAttribute(idx, 1));
   g.computeBoundingSphere();
   return g;
@@ -77,7 +100,7 @@ export class TerrainStreamer {
     this.scene = scene;
     this.world = world;
     this.chunks = new Map();
-    this.radius = 3;
+    this.radius = 6; // enxerga longe (terceira pessoa); detalhe cai com a distância
     this.stats = { built: 0, disposed: 0, ms: 0, queue: 0 };
   }
 
@@ -91,7 +114,10 @@ export class TerrainStreamer {
     for (let j = cj - R; j <= cj + R; j++)
       for (let i = ci - R; i <= ci + R; i++) {
         const d = Math.hypot(i - ci, j - cj);
-        if (d > R + 0.5 || this.chunks.has(this.key(i, j))) continue;
+        if (d > R + 0.5) continue;
+        const have = this.chunks.get(this.key(i, j));
+        // falta, ou está com menos detalhe do que a distância pede (o jogador chegou perto)
+        if (have && have.lod <= lodFor(d)) continue;
         want.push({ i, j, d });
       }
     want.sort((a, b) => a.d - b.d);
@@ -100,7 +126,7 @@ export class TerrainStreamer {
       // o chunk sob o jogador sempre sai na hora; o resto respeita o orçamento
       if (w.d > 1.5 && performance.now() - t0 > budgetMs) break;
       const s = performance.now();
-      this.build(w.i, w.j);
+      this.build(w.i, w.j, lodFor(w.d));
       this.stats.ms = this.stats.ms * 0.8 + (performance.now() - s) * 0.2;
       this.stats.built++;
     }
@@ -110,17 +136,23 @@ export class TerrainStreamer {
     }
   }
 
-  build(i, j) {
+  build(i, j, lod = 0) {
     const field = this.world.field;
+    const k = this.key(i, j);
+    if (this.chunks.has(k)) this.dispose(k); // troca de nível de detalhe
     const group = new THREE.Group();
-    const mesh = new THREE.Mesh(buildChunkGeometry(field, i * CHUNK, j * CHUNK), terrainMat);
-    mesh.receiveShadow = true;
+    const mesh = new THREE.Mesh(buildChunkGeometry(field, i * CHUNK, j * CHUNK, LOD_SEG[lod]), terrainMat);
+    mesh.receiveShadow = lod < 2;
     group.add(mesh);
-    this.world.bridges.forChunk(i, j); // ponte do trecho de rio (entra no orçamento do chunk)
-    const props = buildProps(this.world, i, j);
+    // objetos e pontes só nos chunks próximos; os distantes são só relevo na névoa
+    let props = { group: new THREE.Group(), list: [], dispose() {} };
+    if (lod < 2) {
+      this.world.bridges.forChunk(i, j); // ponte do trecho de rio (entra no orçamento do chunk)
+      props = buildProps(this.world, i, j);
+    }
     group.add(props.group);
     this.scene.add(group);
-    this.chunks.set(this.key(i, j), { i, j, group, mesh, props });
+    this.chunks.set(k, { i, j, group, mesh, props, lod });
     this.world.pool.dirty = true;
   }
 

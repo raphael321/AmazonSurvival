@@ -62,7 +62,8 @@ void main() {
   float fn = wNoise(vXZ * 0.035 + vec2(uTime * 0.35, -uTime * 0.2));
   float foam = step(0.62, shore + 0.28 * fn);
   col = mix(col, uFoam, foam * 0.9);
-  gl_FragColor = vec4(col, mix(0.78, 0.94, smoothstep(0.0, 0.5, depth)));
+  // transparente o bastante para ver os peixes logo abaixo da superfície
+  gl_FragColor = vec4(col, mix(0.6, 0.84, smoothstep(0.0, 0.6, depth)));
   #include <fog_fragment>
 }`;
 
