@@ -130,7 +130,8 @@ export class Capybara {
     this.y += this.vy * dt;
     const bx = this.x, by = this.y;
     world.resolve(this, 20, px, py);
-    this.z += (world.groundZ(this.x, this.y) - this.z) * (1 - Math.exp(-dt * 12));
+    if (world.stepZ) this.z = world.stepZ(this, dt);
+    else this.z += (world.groundZ(this.x, this.y) - this.z) * (1 - Math.exp(-dt * 12));
     // se bateu em algo ao vagar, desiste do alvo
     if (this.state === 'wander' && Math.hypot(bx - this.x, by - this.y) > 1) this.timer = Math.min(this.timer, -5.5);
 

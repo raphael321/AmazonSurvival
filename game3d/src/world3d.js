@@ -3,6 +3,7 @@ import { TerrainStreamer } from './terrain3d.js';
 import { PropPool } from './props3d.js';
 import { inflate } from './assets.js';
 import { Bridges } from './bridges3d.js';
+import { Physics } from './physics3d.js';
 
 // Mundo 3D com a MESMA interface que o Player e a Capybara do 2D usam
 // (resolve, isFree, groundZ, findSpawn): a lógica deles roda aqui sem mudanças.
@@ -14,6 +15,7 @@ export class World3D {
     this.extras = []; // objetos fora do gerador (ex.: vitrine perto do início)
     this.pool = new PropPool(scene);
     this.bridges = new Bridges(this);
+    this.physics = new Physics(this);
     this.streamer = new TerrainStreamer(scene, this);
     this.setParams(params);
   }
@@ -26,13 +28,21 @@ export class World3D {
   }
 
   // chão: sobre a água a superfície é 0 (o jogador não entra no fundo)
+  // chão do terreno (sem malhas); para entidades use groundAt/stepZ, que incluem a física
   groundZ(x, y) {
-    const b = this.bridges.deckAt(x, y);
-    return b ? Math.max(b.deckZ, this.field.H(x, y)) : Math.max(0, this.field.H(x, y));
+    return Math.max(0, this.field.H(x, y));
   }
 
+  groundAt(x, y, z) {
+    return this.physics.groundAt(x, y, z);
+  }
+
+  stepZ(e, dt) {
+    return this.physics.stepZ(e, dt);
+  }
+
+  // terreno pisável (a ponte e outras malhas entram pela física em resolve)
   walkable(x, y) {
-    if (this.bridges.deckAt(x, y)) return true; // sobre a ponte dá para atravessar o rio
     const h = this.field.H(x, y);
     if (h < -6) return false; // água funda
     if (this.field.forest(x, y)) return false; // mata fechada
@@ -47,7 +57,13 @@ export class World3D {
 
   resolve(e, rad, px, py) {
     if (e.noclip) return;
-    const ok = (x, y) => this.walkable(x - rad, y) && this.walkable(x + rad, y) && this.walkable(x, y - rad) && this.walkable(x, y + rad);
+    const bodies = this.physics.bodiesNear(e.x, e.y);
+    const z = e.z || 0;
+    // pisável: terreno bom OU uma malha embaixo do pé (tabuleiro da ponte sobre o rio)
+    const foot = (x, y) => this.walkable(x, y) || (bodies.length > 0 && this.physics.hasFooting(x, y, z, bodies));
+    // caiu na água funda (ex.: pulou da ponte): deixa nadar até sair
+    const swimming = !foot(px, py);
+    const ok = swimming ? () => true : (x, y) => foot(x - rad, y) && foot(x + rad, y) && foot(x, y - rad) && foot(x, y + rad);
     if (!ok(e.x, e.y)) {
       if (ok(e.x, py)) e.y = py;
       else if (ok(px, e.y)) e.x = px;
@@ -61,6 +77,8 @@ export class World3D {
         if (ok(nx, ny)) { e.x = nx; e.y = ny; } else { e.x = px; e.y = py; }
       }
     }
+    // paredes, estacas, bancada, pedras: a cápsula é empurrada pela forma real
+    if (bodies.length) this.physics.pushOut(e, rad, e.height || 80, bodies);
   }
 
   isFree(x, y, rad) {

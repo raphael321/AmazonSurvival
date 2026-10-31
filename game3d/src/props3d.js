@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { toon, INK_MATERIAL } from './toon.js';
+import { deckHeight } from './physics3d.js';
 
 // Objetos da mata em 3D low-poly, gerados por código (sem arquivos).
 // Cada tipo é um InstancedMesh por chunk: uma chamada de desenho para todos daquele tipo.
@@ -122,6 +123,9 @@ const TARGET_H = {
 const FAR = { big: 3400, mid: 2200, small: 1400 };
 const LOD_NEAR = 850; // além disso usa a versão de baixo detalhe
 const SIZE = (name) => (TARGET_H[name] || 0) >= 130 ? 'big' : (TARGET_H[name] || 0) >= 58 ? 'mid' : 'small';
+// objetos que colidem pela forma real da malha (física), e não por um círculo
+const MESH_PHYS = new Set(['bancada', 'portao', 'sela', 'tronco_caido', 'tronco_musgo', 'tronco', 'toco_raizes', 'toco_cortado', 'toco_a', 'toco_b', 'arco_raiz',
+  'pedra_capim', 'pedra_achatada', 'pedra_musgo', 'pedras_grupo', 'menir', 'pedra_musgo2']);
 const SOLID = new Set(['bancada', 'portao', 'sela', 'tronco_caido', 'tronco_musgo', 'tronco', 'toco_raizes', 'toco_cortado', 'toco_a', 'toco_b', 'arco_raiz']);
 
 function hash2(i, j, s) {
@@ -227,7 +231,11 @@ export class PropPool {
       if (!m) return;
       const b = p.bridge, sc = b.length / m.size.x;
       const ang = Math.atan2(-b.dy, b.dx);
-      out.push(['m:ponte', compose(b.x, b.deckZ - m.size.y * 0.5 * sc, b.y, ang, sc, sc)]);
+      // o tabuleiro (medido no próprio modelo) fica exatamente na altura das margens
+      if (m.deck === undefined) m.deck = deckHeight(m) + m.geometry.boundingBox.min.y;
+      const mat = compose(b.x, b.deckZ - m.deck * sc, b.y, ang, sc, sc);
+      out.push(['m:ponte', mat]);
+      if (!p.phys) p.phys = { name: 'ponte', m: mat.clone(), reach: b.length / 2 };
       return;
     }
     if (p.kind === 'samauma') { push('samaumaTrunk', 0.85 + h * 0.3); push('samaumaCanopy', 0.85 + h * 0.3); return; }
@@ -238,7 +246,11 @@ export class PropPool {
     const v = 0.85 + h * 0.3;
     if (got) {
       push('m:' + got.name, got.m.scale * v);
-      if (SOLID.has(got.name) && !p.collider) p.collider = Math.max(got.m.size.x, got.m.size.z) * got.m.scale * v * 0.35;
+      if (MESH_PHYS.has(got.name)) {
+        // colisão pela malha: guarda a matriz do objeto e desliga o círculo
+        if (!p.phys) p.phys = { name: got.name, m: out[out.length - 1][1].clone(), reach: Math.max(got.m.size.x, got.m.size.z) * got.m.scale * v };
+        p.collider = 0;
+      } else if (SOLID.has(got.name) && !p.collider) p.collider = Math.max(got.m.size.x, got.m.size.z) * got.m.scale * v * 0.35;
     } else if (p.kind === 'samauma' || p.kind === 'forest') { push('forestTrunk', v); push('forestCanopy', v); }
     else if (p.kind === 'bush') push('bush', 0.85 + (p.variant % 3) * 0.15);
     else if (p.kind === 'rock') push('rock', p.size || 1);

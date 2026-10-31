@@ -42,6 +42,8 @@ Formato: data · decisão · motivo · alternativas descartadas. Atualize sempre
 | 2026-10-31 | **Pontes procedurais sobre os rios**: por região de 2×2 chunks, a travessia mais curta de um rio de verdade (ruído de rio, não lagoa), com terra firme depois das margens; o modelo `ponte` é esticado e girado na travessia e o tabuleiro é andável; objetos não nascem na água nem no caminho da ponte | Pedido do Raphael: "nos rios ter pontes" | Ponte espalhada aleatória |
 | 2026-10-31 | **Mapa**: minimapa no canto e mapa grande (M) com relevo sombreado, água, mata, rocha, pontes marcadas e seta do jogador; relevo amostrado do campo de altura e refeito só quando o jogador se afasta; pontes buscadas aos poucos | Pedido: "marcar no mapa" | — |
 | 2026-10-31 | Build de página única reprodutível: `npm run page` (game3d/tools/build-page.mjs) embute os .glb em base64 | Publicar sem servidor (Artifact, itch.io) | Montar o HTML à mão |
+| 2026-10-31 | **Física de personagem com three-mesh-bvh** (colisão contra a forma real dos modelos): corpo = cápsula empurrada para fora dos triângulos; chão = raio vertical (pisa no tabuleiro da ponte, sobe degraus de até 20); gravidade e pulo (Espaço); quem cai na água funda nada até sair. Construções, troncos, tocos, pedras e a ponte colidem pela malha; árvores seguem com círculo no tronco | Pedido: andar na ponte de verdade e passar pelo vão do portão da paliçada. Custo medido: ~0,23 ms/quadro | Rapier (motor de física completo, ~10× mais pesado; fica para quando houver objetos dinâmicos) |
+| 2026-10-31 | Ponte posicionada pela **altura medida do tabuleiro** (raios sobre o próprio modelo), não por estimativa | Tabuleiro exatamente na altura das margens | Metade da altura do modelo |
 
 ## Dúvidas em aberto
 

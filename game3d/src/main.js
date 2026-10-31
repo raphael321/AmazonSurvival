@@ -68,8 +68,10 @@ const capy = new Capybara(...world.findSpawn(spawn[0] + 220, spawn[1] + 160));
 player.z = world.groundZ(...spawn);
 capy.z = world.groundZ(capy.x, capy.y);
 // pés pisam no relevo de verdade (altura relativa à base do corpo)
-player.rig.groundRel = (x, y) => world.groundZ(x, y) - player.z;
-capy.rig.groundRel = (x, y) => world.groundZ(x, y) - capy.z;
+player.rig.groundRel = (x, y) => world.groundAt(x, y, player.z) - player.z;
+capy.rig.groundRel = (x, y) => world.groundAt(x, y, capy.z) - capy.z;
+player.height = 88; // cápsula de colisão
+capy.height = 52;
 // modelos 3D carregam em segundo plano: o mundo abre na hora e eles aparecem ao chegar
 loadModels(window.__ASSET_BASE || '').then((m) => { world.setModels(m); world.addShowcase(spawn[0], spawn[1], [0, 2, 3]); }).catch((e) => console.warn('modelos não carregaram', e));
 const gameMap = new GameMap(world);
@@ -208,6 +210,7 @@ const wrapInput = {
   get mouse() { return input.mouse; },
   get clicked() { return input.clicked; },
   down: (...c) => input.down(...c),
+  hit: (...c) => input.hit(...c),
   axis: () => input.axis(),
 };
 
