@@ -164,6 +164,8 @@ export class Dino {
 
   // ---------- comportamento ----------
   okGround(world, x, y) {
+    // bichos da caverna ficam no salão
+    if (this.sp.cave) return !!world.cave && world.cave.walkable(x, y);
     const f = world.field, h = f.H(x, y);
     // água rasa (margem, igarapé) dá para atravessar; só a funda é do Oxalaia
     if (h < -30 && !this.sp.swim) return false;
@@ -174,9 +176,10 @@ export class Dino {
   pickTarget(world) {
     const sp = this.sp;
     for (let k = 0; k < 12; k++) {
-      const a = Math.random() * Math.PI * 2, r = 250 + Math.random() * 900;
+      const a = Math.random() * Math.PI * 2, r = sp.cave ? 60 + Math.random() * 300 : 250 + Math.random() * 900;
       const x = this.home[0] + Math.cos(a) * r, y = this.home[1] + Math.sin(a) * r;
       if (!this.okGround(world, x, y)) continue;
+      if (sp.cave) return [x, y];
       const h = world.field.H(x, y);
       // o Oxalaia fica no rio ou na margem; os outros em terra
       if (sp.habitat === 'rio' && h > 40) continue;
@@ -200,9 +203,11 @@ export class Dino {
     this.angry = Math.max(0, (this.angry || 0) - Math.max(0, dt));
     const hostile = sp.aggressive || this.angry > 0.5;
     const hunting = ['roar', 'stalk', 'charge', 'leap', 'retreat'].includes(this.state);
-    const alert = hostile && !hunting && dp < (this.angry > 0 ? 900 : sp.habitat === 'rio' ? 650 : sp.leap ? 700 : 560) && !player.dead;
+    // bicho da caverna só percebe quem está lá dentro (e vice-versa)
+    const sameSpace = !sp.cave || (world.cave && world.cave.inside(player.x, player.y, player.z));
+    const alert = hostile && !hunting && sameSpace && dp < (this.angry > 0 ? 900 : sp.habitat === 'rio' ? 650 : sp.cave ? 520 : sp.leap ? 700 : 560) && !player.dead;
     // desiste da caça: jogador longe, morto, ou o bicho longe demais de casa
-    if (hunting && (dp > 1500 || player.dead || Math.hypot(this.x - this.home[0], this.y - this.home[1]) > 2600)) {
+    if (hunting && (dp > 1500 || !sameSpace || player.dead || Math.hypot(this.x - this.home[0], this.y - this.home[1]) > 2600)) {
       this.target = this.home; this.setState('walk', 20);
     }
     switch (this.state) {
@@ -341,8 +346,9 @@ export class Dino {
     const h = world.field.H(this.x, this.y);
     const swimT = sp.swim && h < -30 ? 1 : 0;
     this.swim += (swimT - this.swim) * (1 - Math.exp(-dt * 2));
-    const g = Math.max(0, h);
-    this.z += (g - this.z) * (1 - Math.exp(-dt * 12));
+    // chão: terreno (água rasa = superfície) ou, na caverna, o piso dela
+    const g = sp.cave ? world.floorAt(this.x, this.y, this.z) : Math.max(0, h);
+    if (isFinite(g)) this.z += (g - this.z) * (1 - Math.exp(-dt * 12));
     // passo: frequência cresce com a raiz da velocidade (passadas mais longas na corrida)
     const v = this.speed / this.scale;
     const freq = sp.freq * Math.sqrt(Math.max(0.05, v / sp.walk));
@@ -586,6 +592,8 @@ export class Dinos {
       d.update(dt, this.world, player);
       if (d.bit) { d.bit = false; events.push({ type: 'mordida', dino: d }); }
       // melhor corpo disponível: rigado (ossos) > modelo animado no shader > procedural
+      // corpo feito por código (aranha, morcego)
+      if (d.sp.makeBody && !d.body) d.body = d.sp.makeBody(this.scene, d);
       const rig = this.rigs && d.sp.rig && this.rigs[d.sp.rig];
       if (rig && !(d.body instanceof RigBody)) { if (d.body) d.body.dispose(); d.body = new RigBody(this.scene, rig, d.sp); }
       const model = this.models && this.models[d.sp.model];
@@ -614,7 +622,7 @@ export class Dinos {
     for (let i = 0; i < L.length; i++)
       for (let j = i + 1; j < L.length; j++) {
         const a = L[i], b = L[j];
-        if (Math.abs(a.x - b.x) > 900 || Math.abs(a.y - b.y) > 900) continue;
+        if (Math.abs(a.x - b.x) > 900 || Math.abs(a.y - b.y) > 900 || Math.abs((a.z || 0) - (b.z || 0)) > 250) continue;
         for (const [ax, ay, ar] of pts(a)) for (const [bx, by, br] of pts(b)) {
           const dx = bx - ax, dy = by - ay, d = Math.hypot(dx, dy), m = ar + br;
           if (d >= m || d < 0.01) continue;
@@ -625,6 +633,7 @@ export class Dinos {
         }
       }
     for (const d of L) {
+      if (d.sp.cave) continue; // lá embaixo não há árvores
       const r0 = (d.bodyR || 30);
       for (const p of w.streamer.propsNear(d.x, d.y, r0 + 400)) {
         const cr = p.kind === 'cliff' ? p.foot * 0.8 : p.collider;
@@ -638,9 +647,13 @@ export class Dinos {
     }
   }
 
-  nearest(x, y, r) {
+  nearest(x, y, r, z = null) {
     let best = null, bd = r;
-    for (const d of this.list) { const dd = Math.hypot(d.x - x, d.y - y); if (dd < bd) { bd = dd; best = d; } }
+    for (const d of this.list) {
+      if (z !== null && Math.abs((d.z || 0) - z) > 300) continue; // outro andar (caverna)
+      const dd = Math.hypot(d.x - x, d.y - y);
+      if (dd < bd) { bd = dd; best = d; }
+    }
     return best;
   }
 }

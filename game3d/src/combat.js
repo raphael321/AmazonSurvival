@@ -130,6 +130,8 @@ export class Combat {
     let hitAnimal = false;
     for (const d of this.dinos.list) {
       if (d.dead || !d.pelvis || !d.mouth) continue;
+      // mesma altura (não acerta o bicho da caverna pisando no chão lá em cima); morcego no ar pega com folga
+      if (Math.abs(d.pelvis[2] - (p.z + 40)) > 240) continue;
       const ax = d.pelvis[0], ay = d.pelvis[1], bx = d.mouth[0], by = d.mouth[1];
       const t = Math.max(0, Math.min(1, ((p.x - ax) * (bx - ax) + (p.y - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2 || 1)));
       const cx = ax + (bx - ax) * t, cy = ay + (by - ay) * t, dd = Math.hypot(cx - p.x, cy - p.y);

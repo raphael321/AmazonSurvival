@@ -85,6 +85,8 @@ export class GameCamera {
         const x = this.target.x - f[0] * ch * t, y = this.target.z - f[1] * ch * t, z = this.target.y + sh * t;
         if (ground(x, y) + 18 > z) { d = Math.max(90, t * 0.85); break; }
       }
+      // caverna: a câmera encosta na parede em vez de atravessar a rocha
+      if (this.collide) d = this.collide(this.target, new THREE.Vector3(-f[0] * ch, sh, -f[1] * ch), d);
       pos = new THREE.Vector3(this.target.x - f[0] * ch * d, this.target.y + sh * d, this.target.z - f[1] * ch * d);
       const g = ground(pos.x, pos.z) + 22;
       if (pos.y < g) pos.y = g;

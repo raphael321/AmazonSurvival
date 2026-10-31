@@ -37,6 +37,12 @@ export class Physics {
   // corpos com malha perto de um ponto: { model, matrix, inverse, scale }
   bodiesNear(x, y, r = 260) {
     const w = this.world, out = [];
+    // caverna: túnel/salão e paredes da boca (não dependem dos modelos do pool)
+    const cave = w.cave;
+    if (cave && cave.ready) {
+      if (cave.body && cave.near2D(x, y, 300)) out.push(cave.body);
+      if (cave.mouthBody && Math.hypot(x - cave.mouth.x, y - cave.mouth.y) < cave.size * 0.8) out.push(cave.mouthBody);
+    }
     const models = w.pool.models;
     if (!models) return out;
     const take = (p) => {
@@ -73,7 +79,9 @@ export class Physics {
   // chão sob o ponto para quem está na altura z: terreno ou malha (até um degrau acima)
   groundAt(x, y, z, bodies = this.bodiesNear(x, y)) {
     const h = this.world.field.H(x, y);
-    const terrain = Math.max(0, h); // superfície da água conta como chão (nado raso)
+    // dentro da caverna o terreno é o teto: só a malha da caverna conta como chão
+    const cave = this.world.cave;
+    const terrain = cave && cave.inside(x, y, z) ? -Infinity : Math.max(0, h); // superfície da água conta como chão (nado raso)
     const mesh = bodies.length ? this.meshGround(x, y, z + STEP, bodies) : -Infinity;
     return Math.max(terrain, mesh);
   }
@@ -120,6 +128,7 @@ export class Physics {
   // está em água funda sem nada para pisar (ponte, pedra)?
   inDeepWater(x, y, z) {
     if (this.world.field.H(x, y) >= DEEP) return false;
+    if (this.world.cave && this.world.cave.inside(x, y, z)) return false;
     const bodies = this.bodiesNear(x, y);
     return !(bodies.length && this.meshGround(x, y, z + STEP, bodies) > DEEP);
   }

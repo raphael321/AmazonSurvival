@@ -36,6 +36,12 @@ export class World3D {
     return Math.max(0, this.field.H(x, y));
   }
 
+  // chão para criaturas: dentro da caverna é a malha dela; fora, o terreno
+  floorAt(x, y, z) {
+    if (this.cave && this.cave.inside(x, y, z)) return this.cave.floorAt(x, y, z);
+    return this.groundZ(x, y);
+  }
+
   groundAt(x, y, z) {
     return this.physics.groundAt(x, y, z);
   }

@@ -9,7 +9,7 @@ import { toonRamp, INK } from './toon.js';
 // velocidade do bicho; onde não há, os ossos são movidos por código (passo, cauda, pescoço).
 // Por cima de tudo, uma camada procedural: olhar, rugir, pastar, deitar, inclinar no terreno.
 
-export const RIG_FILES = { amazon: 'assets/rig-amazonssauro.glb', onca: 'assets/rig-onca.glb' };
+export const RIG_FILES = { amazon: 'assets/rig-amazonssauro.glb', onca: 'assets/rig-onca.glb', cobra: 'assets/rig-cobra.glb' };
 
 export async function loadRigs(base = '') {
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
@@ -101,6 +101,12 @@ export class RigBody {
     }
     this.tail = ['Tail_0', 'Tail_1', 'Tail_2'].map((n) => this.bones[n]).filter(Boolean);
     this.neck = ['Head_0', 'Head_1', 'Head_2'].map((n) => this.bones[n]).filter(Boolean);
+    // serpente: a coluna inteira (da cabeça para a cauda) ondula
+    if (sp.serpent) {
+      this.spine = Object.entries(this.bones).filter(([n]) => n !== 'Root' && !n.startsWith('Head')).map(([, b]) => b);
+      this.spine.sort((a, b) => b.userData.pos.dot(this.fwd) - a.userData.pos.dot(this.fwd));
+      this.crawl = 0;
+    }
     // animações prontas
     this.mixer = gltf.animations.length ? new THREE.AnimationMixer(this.root) : null;
     this.walk = null;
@@ -143,8 +149,9 @@ export class RigBody {
     const run = clamp((v - sp.walk) / (sp.run - sp.walk), 0, 1);
     // posição, direção e inclinação com o terreno
     const L = this.len * k;
-    const gB = world.groundZ(d.x - fx * L * 0.3, d.y - fy * L * 0.3), gF = world.groundZ(d.x + fx * L * 0.3, d.y + fy * L * 0.3);
-    const gC = world.groundZ(d.x, d.y);
+    const G = (x, y) => { const g = world.floorAt(x, y, d.z + 40); return isFinite(g) ? g : d.z; };
+    const gB = G(d.x - fx * L * 0.3, d.y - fy * L * 0.3), gF = G(d.x + fx * L * 0.3, d.y + fy * L * 0.3);
+    const gC = G(d.x, d.y);
     const slopeT = clamp(Math.atan2(gF - gB, L * 0.6), -0.3, 0.3) * (1 - d.swim);
     this.pitch += (slopeT - this.pitch) * 0.1;
     const restDrop = d.rest * this.height * k * 0.38;
@@ -180,11 +187,17 @@ export class RigBody {
       this.rot(l.chain[0], 'sideAxis', (l.front ? -0.9 : 0.9) * d.rest);
       this.rot(l.chain[1], 'sideAxis', (l.front ? 1.5 : -1.5) * d.rest);
     }
-    // cauda: onda que corre para a ponta e curva nas viradas
+    // serpente: onda lateral que corre da cabeça para a cauda; avança com a distância percorrida
+    if (this.spine) {
+      this.crawl += (d.speed / d.scale) * dt * 0.035 + dt * 0.4;
+      const amp = 0.1 + 0.22 * moving;
+      this.spine.forEach((b, i) => this.rot(b, 'upAxis', Math.sin(this.crawl * 2.2 - i * 0.75) * amp + this.turn * 0.25));
+    }
+    // cauda: onda que corre para a ponta e curva nas viradas (a serpente já ondula inteira)
     const turn = this.prevA === null ? 0 : angDiff(this.prevA, d.a) / Math.max(dt, 1e-3);
     this.prevA = d.a;
     this.turn += (clamp(-turn * 0.4, -0.5, 0.5) - this.turn) * 0.08;
-    this.tail.forEach((b, i) => {
+    if (!this.spine) this.tail.forEach((b, i) => {
       const w = Math.sin(d.t * (1.4 + run * 3) - i * 0.9) * (0.1 + 0.06 * i);
       this.rot(b, 'upAxis', w + this.turn * (0.4 + i * 0.3));
       this.rot(b, 'sideAxis', -d.rest * 0.15);

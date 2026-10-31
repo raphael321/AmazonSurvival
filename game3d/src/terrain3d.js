@@ -11,6 +11,13 @@ const LOD_SEG = [48, 24, 12];
 const lodFor = (d) => (d <= 1.6 ? 0 : d <= 3.6 ? 1 : 2);
 
 const terrainMat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonRamp() });
+// buraco no terreno (boca da caverna): x, z do centro, raio; raio 0 = sem buraco
+export const terrainHole = { value: new THREE.Vector3(0, 0, 0) };
+terrainMat.onBeforeCompile = (sh) => {
+  sh.uniforms.uHole = terrainHole;
+  sh.vertexShader = 'varying vec2 vHoleW;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvHoleW = (modelMatrix * vec4(position, 1.0)).xz;');
+  sh.fragmentShader = 'uniform vec3 uHole;\nvarying vec2 vHoleW;\n' + sh.fragmentShader.replace('void main() {', 'void main() {\n  if (uHole.z > 0.0 && distance(vHoleW, uHole.xy) < uHole.z) discard;');
+};
 
 const C = (hex) => new THREE.Color(hex);
 const MUD = C('#6e5634'), BANK = C('#5a4a32'), GRASS_LO = C('#5d6a38'), GRASS_HI = C('#4a6a3a');

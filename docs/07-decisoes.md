@@ -117,3 +117,11 @@ Formato: data · decisão · motivo · alternativas descartadas. Atualize sempre
 - **Bug:** o 1º quadro tinha tempo negativo e deixava o Amazonssauro "bravo" sem provocação. `dt` agora nunca é negativo.
 - **Cachoeira** (`game3d/src/waterfall.js`): procura um barranco alto (≥170) colado na água perto do início; cortina d'água em arco com faixas descendo, espuma no pé, névoa, pedras emoldurando; zona sem árvores na queda e na vista. O jogador nasce de frente para ela.
 - **Câmera:** travada em 3ª pessoa (visão tática só no F2, para depurar); volta sozinha para trás do personagem ao andar para frente sem mexer o mouse.
+
+## 2026-11-01 — Inventário, combate, caverna e bichos da caverna
+
+- **Inventário** (`game3d/src/combat.js`): barra 1–4 (facão, machado, espada, arco), madeira, carne, flechas (20; **C** faz 5 flechas com 1 madeira). Arma desenhada na mão do personagem.
+- **Árvores**: têm vida; o machado derruba em 3 golpes (facão 12, espada 24). A árvore **tomba** para o lado oposto ao jogador, afunda e some; dá madeira. Cortadas saem do pool, da colisão e da física (`world.cut`). Tronco da mata com colisão maior (antes dava para atravessar).
+- **Animais**: têm vida e morrem (tombam de lado e ficam 40 s); abater dá carne. Golpe/flecha deixa herbívoro furioso (regra: só revida se atacado). Flechas com gravidade, cravam no chão.
+- **Caverna híbrida** (`cave.js`): boca = modelo do Raphael (sem a placa do chão, ~11 mil triângulos) numa clareira perto do início; terreno com **buraco** (shader descarta) embaixo da boca; túnel (anéis com piso plano) desce por baixo do morro até um **salão** (elipsoide com ruído) com estalactites, estalagmites e cristais com luz. Dentro: física e câmera usam a malha da caverna (terreno vira teto), câmera encosta na rocha, sol some, **tocha** acende.
+- **Bichos da caverna** (`cavelife.js`): **sucuri** (modelo rigado do Raphael, coluna inteira ondula), **aranha-caranguejeira** (8 patas em grupos alternados, pula no bote) e **morcegos** (asas batendo, rasante). Só percebem quem está dentro da caverna.

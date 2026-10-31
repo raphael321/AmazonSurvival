@@ -11,6 +11,8 @@ import { PlayerMesh, CapybaraMesh } from './actors3d.js';
 import { Dinos } from './dinos.js';
 import { Waterfall } from './waterfall.js';
 import { Inventory, Combat } from './combat.js';
+import { Cave } from './cave.js';
+import { populateCave } from './cavelife.js';
 import { loadRigs } from './rigs.js';
 import { loadModels } from './assets.js';
 import { GameMap } from './map3d.js';
@@ -50,12 +52,15 @@ const hemi = new THREE.HemisphereLight('#e8f0d0', '#4a3a24', 1.4);
 scene.add(hemi);
 // sol do topo-esquerda da tela (oeste no mundo), quente de fim de tarde
 const sun = new THREE.DirectionalLight('#ffe2a8', 2.4);
+let caveLight = 0;
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -1100, right: 1100, top: 1100, bottom: -1100, near: 50, far: 4000 });
 sun.shadow.bias = -0.0004;
 sun.shadow.normalBias = 1.5;
 scene.add(sun, sun.target);
+// luz de referência (a caverna escurece a partir destes valores)
+const lightRefs = { hemi, sun, fog: scene.fog, hemiBase: 1.4, sunBase: 2.4, fogBase: SKY.horizon.clone(), fogDensity: 0.00028 };
 const SUN_DIR = new THREE.Vector3(-0.85, 1.1, -0.15).normalize();
 
 
@@ -84,6 +89,16 @@ if (wfSite) {
   const tx = waterfall.top[0], ty = waterfall.top[1];
   for (let k = 0; k <= 6; k++) world.clearZones.push({ x: spawn[0] + (tx - spawn[0]) * (k / 6), y: spawn[1] + (ty - spawn[1]) * (k / 6), r: 170 });
 }
+// caverna perto do início: a boca fica de frente para o jogador, numa clareira
+const cave = new Cave(scene, world);
+const caveSite = cave.find(spawn[0], spawn[1]);
+if (caveSite) {
+  cave.build(caveSite, null);
+  world.cave = cave;
+  world.clearZones.push({ x: caveSite.x, y: caveSite.y, r: cave.size * 0.8 });
+  // caminho livre do início até a boca
+  for (let k = 1; k <= 5; k++) world.clearZones.push({ x: spawn[0] + (caveSite.x - spawn[0]) * (k / 6), y: spawn[1] + (caveSite.y - spawn[1]) * (k / 6), r: 140 });
+}
 // começa olhando para a cachoeira
 if (waterfall.top) gameCam.yaw = Math.atan2(waterfall.top[1] - spawn[1], waterfall.top[0] - spawn[0]);
 const player = new Player(...spawn);
@@ -98,7 +113,7 @@ capy.height = 52;
 player.swimDepth = -50; // nadando: água no peito
 capy.swimDepth = -22; // capivara nada com o lombo de fora
 // modelos 3D carregam em segundo plano: o mundo abre na hora e eles aparecem ao chegar
-loadModels(window.__ASSET_BASE || '').then((m) => { world.setModels(m); dinos.models = m; }).catch((e) => console.warn('modelos não carregaram', e));
+loadModels(window.__ASSET_BASE || '').then((m) => { world.setModels(m); dinos.models = m; cave.setModels(m); }).catch((e) => console.warn('modelos não carregaram', e));
 const gameMap = new GameMap(world);
 // clima: água com rio correndo, gramado em volta do personagem, traços de vento e fogueira
 const water = new Water(scene, world);
@@ -113,6 +128,8 @@ const popups = new Popups();
 // dinossauros (Ecos do Cretáceo): um de cada perto do começo, depois a população se mantém em volta
 const dinos = new Dinos(scene, world);
 dinos.showcase(spawn[0], spawn[1]);
+// sucuris, aranhas e morcegos no salão da caverna
+if (cave.ready) populateCave(dinos, cave);
 // inventário (1–4: facão, machado, espada, arco) e combate
 const inv = new Inventory();
 const combat = new Combat(scene, world, dinos, inv);
@@ -236,6 +253,10 @@ function onStrike(p) {
   }
 }
 
+function inCaveHint() {
+  return cave.inside(player.x, player.y, player.z);
+}
+
 function interact() {
   const dCapy = Math.hypot(capy.x - player.x, capy.y - player.y);
   const at = toScreen(capy.x, capy.y, capy.z + 55);
@@ -322,8 +343,9 @@ function update(dt) {
   hint = '';
   if (dCapy < 85 && capy.state !== 'flee') hint = capy.tamed ? 'E — fazer carinho' : player.fruits > 0 ? 'E — oferecer camu-camu' : 'Você precisa de camu-camu (moitas com frutinhas vermelhas)';
   else if (world.nearestFruitBush(player.x, player.y, 80)) hint = 'E — colher camu-camu';
+  else if (cave.ready && !inCaveHint() && Math.hypot(player.x - cave.mouth.x, player.y - cave.mouth.y) < cave.size * 0.9) hint = 'Caverna — entre pelo arco (a tocha acende sozinha)';
   else {
-    const d = dinos.nearest(player.x, player.y, 700);
+    const d = dinos.nearest(player.x, player.y, 700, player.z);
     if (d) hint = d.state === 'charge' || d.state === 'leap' ? `${d.sp.nome} vai dar o bote — corra!` : d.state === 'stalk' || d.state === 'retreat' ? `${d.sp.nome} está te rodeando...` : d.sp.aggressive ? `${d.sp.nome} — carnívoro, fique longe.` : d.angry > 0 ? `${d.sp.nome} está furioso!` : `${d.sp.nome} — herbívoro, só ataca se for atacado.`;
   }
 
@@ -331,7 +353,11 @@ function update(dt) {
   const fov = gameCam.mode === 'terceira' ? 55 : 32;
   if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
   gameCam.follow(dt, player.angle, Math.hypot(player.vx || 0, player.vy || 0) > 20);
-  gameCam.update(dt, player.x, player.y, player.z, (x, y) => world.groundZ(x, y));
+  // dentro da caverna: o terreno é o teto (não empurra a câmera) e a rocha limita a distância
+  const inCave = cave.ready && cave.inside(player.x, player.y, player.z);
+  gameCam.collide = inCave ? (t, dir, d) => cave.rayFree(t, dir.normalize(), d) : null;
+  gameCam.update(dt, player.x, player.y, player.z, inCave ? () => -1e9 : (x, y) => world.groundZ(x, y));
+  caveLight = cave.update(dt, player, lightRefs);
   // árvore entre a câmera e o personagem some (a colisão física continua valendo)
   if (gameCam.mode === 'terceira') {
     const ax = camera.position.x, ay = camera.position.z, bx = player.x, by = player.y;
@@ -397,4 +423,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__game = { inv, combat, waterfall, dinos, fish, gameCam, sky, grass, grassSettings, windSettings, water, trails, campfire, gameMap, world, player, capy, camera, renderer, scene, view, params, get fps() { return fps; } };
+window.__game = { cave, inv, combat, waterfall, dinos, fish, gameCam, sky, grass, grassSettings, windSettings, water, trails, campfire, gameMap, world, player, capy, camera, renderer, scene, view, params, get fps() { return fps; } };
