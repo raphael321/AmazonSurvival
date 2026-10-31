@@ -141,13 +141,16 @@ export class Grass {
       if (k >= n) continue;
       const h = f.H(x, y);
       if (h < 4 || h > rockH) continue; // nada de grama na água, na lama da margem nem na rocha
-      if (f.forest(x, y) && keep > 0.35) continue; // mata fechada: chão mais limpo
+      // sub-bosque da terra firme tem só 2–15% da luz: quase nada de capim, chão de folhas
+      if (f.forest(x, y) && keep > 0.08) continue;
       if (f.slope(x, y) > 0.95) continue;
+      // várzea: capim alto da beira (canarana)
+      const bank = h < 22 ? 1.6 : 1;
       off[idx * 3] = x;
       off[idx * 3 + 1] = h - 1;
       off[idx * 3 + 2] = y;
       par[idx * 3] = rot;
-      par[idx * 3 + 1] = hgt;
+      par[idx * 3 + 1] = hgt * bank;
       par[idx * 3 + 2] = tint;
     }
     this.offset.addUpdateRange(base * 3, this.perSlot * 3);

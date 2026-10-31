@@ -14,7 +14,7 @@ const terrainMat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap:
 
 const C = (hex) => new THREE.Color(hex);
 const MUD = C('#6e5634'), BANK = C('#5a4a32'), GRASS_LO = C('#5d6a38'), GRASS_HI = C('#4a6a3a');
-const FOREST = C('#33472c'), ROCK = C('#8a8470'), ROCK_DK = C('#6b6656'), BED = C('#4a3a22');
+const FOREST = C('#33472c'), LITTER = C('#4f4128'), VARZEA = C('#7d6744'), ROCK = C('#8a8470'), ROCK_DK = C('#6b6656'), BED = C('#4a3a22');
 
 function hash(x, y) {
   const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
@@ -46,8 +46,11 @@ function buildChunkGeometry(field, cx, cy, SEG) {
       // cor por altitude, inclinação e bioma
       if (h < -4) c.copy(BED);
       else if (h < 6) c.copy(BANK).lerp(MUD, Math.max(0, (h + 4) / 10));
+      // várzea: faixa baixa junto da água, lama clara deixada pela cheia
+      else if (h < 18 && slope < 0.5) c.copy(VARZEA).lerp(GRASS_LO, (h - 6) / 12);
       else if (h > rockH || slope > 0.95) c.copy(ROCK_DK).lerp(ROCK, hash(x, y));
-      else if (field.forest(x, y)) c.copy(FOREST);
+      // sub-bosque: pouca luz, chão de folhas secas com manchas de musgo
+      else if (field.forest(x, y)) c.copy(LITTER).lerp(FOREST, hash(x * 0.011, y * 0.011) * 0.6);
       else c.copy(GRASS_LO).lerp(GRASS_HI, Math.min(1, h / Math.max(1, rockH)));
       const v = 0.94 + hash(x * 0.37, y * 0.37) * 0.12;
       col[k * 3] = c.r * v;

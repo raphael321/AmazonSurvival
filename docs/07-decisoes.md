@@ -75,3 +75,8 @@ Formato: data · decisão · motivo · alternativas descartadas. Atualize sempre
 - A placa do "chão" que a Tripo põe embaixo é cortada no pipeline (`game3d/tools/trim-base.mjs`, triângulos abaixo de 1,5–2,2% da altura).
 - Posição: grade de 4 blocos; encosta com inclinação > 0,55 → penhasco/falésia (> 0,9) ou blocos; alto dos morros → chance menor. Assentado pelo ponto mais baixo da área ocupada (não flutua na encosta). Parâmetro `cliffs` no painel (Bioma → Objetos).
 - Colisão pela malha (MESH_PHYS); a câmera esconde o penhasco que fica entre ela e o jogador; o ponto inicial evita penhascos.
+
+## 2026-10-31 — Fidelidade ao bioma (ver `docs/09-bioma-amazonico.md`)
+
+- Rios com **cor real**: água branca (barrenta) e água preta (chá), por bacia, com fronteira nítida tipo Encontro das Águas. O azul aprovado antes continua disponível no painel ("água real" = 0).
+- Sub-bosque sem capim e com chão de folhas; várzea pintada junto da água; açaí e samaúma concentrados perto dos rios.

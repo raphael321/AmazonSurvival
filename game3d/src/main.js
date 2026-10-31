@@ -104,7 +104,7 @@ const groups = [
   ['Terreno', [
     ['Ruído', [['frequency', 'frequência', 0.005, 0.15, 0.001], ['octaves', 'oitavas', 1, 8, 1], ['persistence', 'persistência', 0.1, 0.9, 0.01], ['lacunarity', 'lacunaridade', 1.2, 3.5, 0.05]]],
     ['Forma', [['maxHeight', 'altura máx.', 1, 20, 0.5], ['heightExponent', 'expoente', 0.4, 4, 0.05], ['waterLevel', 'nível da água', 0, 8, 0.1], ['heightScale', 'escala vertical', 0.3, 3, 0.05], ['terrace', 'degraus', 0, 1, 0.05], ['rockLine', 'linha da rocha', 0.2, 1, 0.01], ['maxSlope', 'subida máx.', 0.3, 3, 0.05]]],
-    ['Rios', [['riverScale', 'tamanho das curvas', 10, 160, 1], ['riverWidth', 'largura', 0, 0.2, 0.005], ['bridges', 'pontes (chance)', 0, 1, 0.05], ['bridgeSpan', 'vão máx. da ponte', 150, 900, 10]]],
+    ['Rios', [['riverScale', 'tamanho das curvas', 10, 160, 1], ['riverWidth', 'largura', 0, 0.2, 0.005], ['bridges', 'pontes (chance)', 0, 1, 0.05], ['bridgeSpan', 'vão máx. da ponte', 150, 900, 10], ['blackWater', 'água preta (fração)', 0, 1, 0.05]]],
   ]],
   ['Bioma', [
     ['Mata fechada', [['forestScale', 'tamanho', 4, 80, 1], ['forestAmount', 'quantidade', 0, 0.7, 0.01]]],
@@ -144,6 +144,7 @@ const camF = pane.addFolder({ title: 'Câmera e mundo', expanded: false });
 camF.addBinding(gameCam, 'dist', { label: 'distância (3ª pessoa)', min: 160, max: 1200, step: 10 });
 camF.addBinding(gameCam, 'sens', { label: 'sensibilidade do mouse', min: 0.0008, max: 0.006, step: 0.0001 });
 camF.addBinding(scene.fog, 'density', { label: 'névoa', min: 0, max: 0.0008, step: 0.00001 });
+camF.addBinding(water.uniforms.uFiel, 'value', { label: 'água real (0 = azul)', min: 0, max: 1, step: 0.05 });
 camF.addBinding(view, 'fly', { label: 'modo voo' });
 camF.addBinding(view, 'shadows', { label: 'sombras' }).on('change', () => { sun.castShadow = view.shadows; });
 camF.addBinding(params, 'seed', { label: 'seed', min: 1, max: 99999, step: 1 }).on('change', rebuild);

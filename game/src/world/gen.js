@@ -183,16 +183,19 @@ export class Gen {
           }
           continue;
         }
-        let acc = p.samauma;
+        // várzea (perto d'água): samaúma e açaizeiro concentrados aqui, como na Amazônia real;
+        // longe dos rios (terra firme aberta) ficam raros
+        const wet = this.nearWater(i, j, 3);
+        let acc = p.samauma * (wet ? 3 : 0.5);
         if (r < acc) {
           out.push({ id, kind: 'samauma', x: px, y: py, z, variant: Math.floor(v * 2), shadow: 70, collider: 62, canopy: 300 });
           continue;
         }
-        if (this.nearWater(i, j)) {
+        if (wet && this.nearWater(i, j)) {
           acc += p.camu * 0.3;
           if (r < acc) { out.push({ id, kind: 'bush', fruit: true, x: px, y: py, z, variant: Math.floor(v * 4), shadow: 30, collider: 18 }); continue; }
         }
-        if (r < (acc += p.acai)) { out.push({ id, kind: 'acai', x: px, y: py, z, variant: Math.floor(v * 6), shadow: 22, collider: 14, canopy: 110 }); continue; }
+        if (r < (acc += p.acai * (wet ? 3.5 : 0.35))) { out.push({ id, kind: 'acai', x: px, y: py, z, variant: Math.floor(v * 6), shadow: 22, collider: 14, canopy: 110 }); continue; }
         if (r < (acc += p.bush)) { out.push({ id, kind: 'bush', fruit: false, x: px, y: py, z, variant: Math.floor(v * 6), shadow: 30, collider: 18 }); continue; }
         if (r < (acc += p.rock)) {
           const size = 0.7 + hash2(i, j, s + 53) * 0.7;
