@@ -8,7 +8,8 @@ import { MeshBVH } from 'three-mesh-bvh';
 // Coordenadas three: (x, altura, y do jogo). Os modelos estão instanciados com uma matriz
 // (posição + giro + escala uniforme); a colisão é feita no espaço local de cada um.
 
-export const STEP = 20; // degrau que o personagem sobe sem pular
+export const STEP = 24; // degrau que o personagem sobe sem pular
+export const DEEP = -6; // abaixo disso o chão está debaixo d'água funda: nada
 const GRAVITY = 1500;
 
 const bvhCache = new Map();
@@ -116,8 +117,28 @@ export class Physics {
   }
 
   // integra a altura: gravidade, pouso, sobe degraus suavemente, pulo
+  // está em água funda sem nada para pisar (ponte, pedra)?
+  inDeepWater(x, y, z) {
+    if (this.world.field.H(x, y) >= DEEP) return false;
+    const bodies = this.bodiesNear(x, y);
+    return !(bodies.length && this.meshGround(x, y, z + STEP, bodies) > DEEP);
+  }
+
   stepZ(e, dt) {
     if (e.vz === undefined) e.vz = 0;
+    // nadando: corpo boia com a água no peito, balançando de leve
+    if (this.inDeepWater(e.x, e.y, e.z) && !(e.vz > 0 && e.z > 0)) {
+      if (!e.swimming) e.swimT = 0;
+      e.swimming = true;
+      e.swimT = (e.swimT || 0) + dt;
+      const target = (e.swimDepth ?? -50) + Math.sin(e.swimT * 2.4) * 2.5;
+      e.z += (target - e.z) * (1 - Math.exp(-dt * (e.z > target + 8 ? 6 : 10)));
+      e.vz = 0;
+      e.grounded = true;
+      e.wantJump = false;
+      return e.z;
+    }
+    e.swimming = false;
     const g = this.groundAt(e.x, e.y, e.z);
     if (e.wantJump && e.grounded) e.vz = 360;
     e.wantJump = false;

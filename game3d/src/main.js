@@ -73,6 +73,8 @@ player.rig.groundRel = (x, y) => world.groundAt(x, y, player.z) - player.z;
 capy.rig.groundRel = (x, y) => world.groundAt(x, y, capy.z) - capy.z;
 player.height = 88; // cápsula de colisão
 capy.height = 52;
+player.swimDepth = -50; // nadando: água no peito
+capy.swimDepth = -22; // capivara nada com o lombo de fora
 // modelos 3D carregam em segundo plano: o mundo abre na hora e eles aparecem ao chegar
 loadModels(window.__ASSET_BASE || '').then((m) => { world.setModels(m); world.addShowcase(spawn[0], spawn[1], [0, 2, 3]); }).catch((e) => console.warn('modelos não carregaram', e));
 const gameMap = new GameMap(world);
@@ -238,7 +240,7 @@ const wrapInput = {
 
 function update(dt) {
   player.noclip = view.fly;
-  player.speedMul = view.fly ? 4 : 1;
+  player.speedMul = view.fly ? 4 : player.swimming ? 0.55 : 1;
   world.update(dt, player.x, player.y);
   // golpe: na 3ª pessoa vai para onde a câmera olha; na tática, para o mouse
   player.update(dt, wrapInput, world, gameCam.mode === 'terceira' ? gameCam.aim(player.x, player.y) : aimAtMouse(), onStrike);

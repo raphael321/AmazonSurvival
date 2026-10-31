@@ -83,7 +83,8 @@ export class Bridges {
       dx: b.dx,
       dy: b.dy,
       length: b.span + over * 2,
-      deckZ: Math.max(b.za, b.zb) + 6,
+      // folga acima d'água: a ponte de cordas cede no meio e não pode afundar no rio
+      deckZ: Math.max(b.za, b.zb, 0) + 16,
       ends: [[b.ax - b.dx * over, b.ay - b.dy * over], [b.bx + b.dx * over, b.by + b.dy * over]],
     };
   }

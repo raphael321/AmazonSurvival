@@ -61,15 +61,17 @@ export class World3D {
     // pisável: terreno bom OU uma malha embaixo do pé (tabuleiro da ponte sobre o rio)
     // água funda: checada em volta do corpo. Inclinação: só no centro e só para SUBIR
     // (subida / passo dado acima do limite = barranco); descer qualquer encosta é livre.
-    const hHere = this.field.H(px, py);
-    const wet = (x, y) => this.field.H(x, y) < -6 && !(bodies.length > 0 && this.physics.hasFooting(x, y, z, bodies));
+    // água é atravessável a nado; a altura que conta é a da superfície (0) sobre a água
+    const surf = (x, y) => Math.max(0, this.field.H(x, y));
+    const hHere = surf(px, py);
     const climbOk = (x, y) => {
       if (bodies.length > 0 && this.physics.hasFooting(x, y, z, bodies)) return true; // ponte, pedra, etc.
       const step = Math.hypot(x - px, y - py);
-      return this.field.H(x, y) - hHere <= this.params.maxSlope * step + 0.5;
+      // nadando dá para escalar a margem para sair do rio
+      const limit = e.swimming ? 2.5 : this.params.maxSlope;
+      return surf(x, y) - hHere <= limit * step + 0.5;
     };
-    const swimming = wet(px, py);
-    const ok = swimming ? () => true : (x, y) => climbOk(x, y) && !wet(x - rad, y) && !wet(x + rad, y) && !wet(x, y - rad) && !wet(x, y + rad);
+    const ok = climbOk;
     if (!ok(e.x, e.y)) {
       if (ok(e.x, py)) e.y = py;
       else if (ok(px, e.y)) e.x = px;

@@ -164,6 +164,7 @@ export function buildProps(world, ci, cj) {
   // objetos com colisão também ficam longe do caminho da ponte (cabeceiras livres)
   const keep = list.filter((q) => field.H(q.x, q.y) > 1.5 && world.bridges.distToDeck(q.x, q.y) > world.bridges.halfWidth + (q.collider || 0) + 8);
   for (const q of keep) {
+    if (q.kind === 'bush') q.collider = 0; // moitas, samambaias e flores: dá para atravessar
     q.z = field.H(q.x, q.y);
     q.picked = world.picked.has(q.id);
   }
