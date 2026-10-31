@@ -20,6 +20,7 @@ export class Capybara {
     this.graze = 0; // 0 cabeça erguida, 1 pastando
     this.chew = 0;
     this.time = 0;
+    this.z = 0;
     this.r = rng(seed);
     this.rig = new Rig({
       legs: [
@@ -129,6 +130,7 @@ export class Capybara {
     this.y += this.vy * dt;
     const bx = this.x, by = this.y;
     world.resolve(this, 20, px, py);
+    this.z += (world.groundZ(this.x, this.y) - this.z) * (1 - Math.exp(-dt * 12));
     // se bateu em algo ao vagar, desiste do alvo
     if (this.state === 'wander' && Math.hypot(bx - this.x, by - this.y) > 1) this.timer = Math.min(this.timer, -5.5);
 

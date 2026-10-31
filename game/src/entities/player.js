@@ -37,6 +37,7 @@ export class Player {
     this.lastRun = -10;
     this.attack = null;
     this.bobZ = 0;
+    this.z = 0; // altura do chão sob o jogador (sobe/desce degraus suavemente)
     this.trail = [];
     this.rig = new Rig({
       legs: [
@@ -93,6 +94,7 @@ export class Player {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
     world.resolve(this, 12, px, py);
+    this.z += (world.groundZ(this.x, this.y) - this.z) * (1 - Math.exp(-dt * 14));
 
     this.rig.update(dt, this.x, this.y, this.angle, this.vx, this.vy, {
       rootZ: this.bobZ,

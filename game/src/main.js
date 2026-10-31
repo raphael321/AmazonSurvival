@@ -1,6 +1,6 @@
 import { Input } from './engine/input.js';
 import { clamp } from './engine/math.js';
-import { toView, groundFromView, sortKey } from './engine/projection.js';
+import { toView, groundFromView, sortKey, Z_K } from './engine/projection.js';
 import { World } from './world/world.js';
 import { DebugPanel, loadParams } from './systems/debug.js';
 import { setDeviceScale } from './art/sprite.js';
@@ -31,6 +31,10 @@ const debug = new DebugPanel({
   toggles: dbgFlags,
   onChange: (p) => {
     world.setParams(p);
+    const old = rs;
+    rs = 0;
+    resize(); // aplica o zoom da câmera
+    if (!rs) rs = old;
     world.setScale(rs);
     // se o novo mundo enterrou o jogador, procura chão firme por perto
     if (!world.isFree(player.x, player.y, 14)) [player.x, player.y] = world.findSpawn(player.x, player.y);
@@ -40,7 +44,7 @@ const debug = new DebugPanel({
 });
 let drawn = 0;
 const popups = new Popups();
-const camTarget = () => { const v = toView(player.x, player.y, 40); return v; };
+const camTarget = () => toView(player.x, player.y, 40 + player.z);
 const cam = { x: camTarget()[0], y: camTarget()[1] };
 
 let sw = 0, sh = 0, dpr = 1, zoom = 1, rs = 0;
@@ -59,7 +63,8 @@ function resize() {
   // escala de renderização em degraus de 0.25, e o zoom se ajusta a ela: sprites e chunks
   // são copiados 1:1 na tela (sem reamostrar a cada quadro) e não repintam à toa
   // teto de 2: acima disso cada chunk passa de 4 MB e telas grandes estouram a memória de canvas
-  const nrs = clamp(Math.round(dpr * clamp(Math.sqrt(sw * sh) / 720, 0.85, 2) * 4) / 4, 0.75, 2);
+  const userZoom = world.params.zoom || 1;
+  const nrs = clamp(Math.round(dpr * clamp(Math.sqrt(sw * sh) / 720, 0.85, 2) * userZoom * 4) / 4, 0.5, 2);
   zoom = nrs / dpr;
   if (nrs !== rs) {
     rs = nrs;
@@ -83,7 +88,7 @@ const viewToWorld = (mx, my) => {
   const vy = (my - sh / 2) / zoom + cam.y;
   return groundFromView(vx, vy);
 };
-const headPos = (e, h) => { const v = toView(e.x, e.y); return [v[0], v[1] - h]; };
+const headPos = (e, h) => { const v = toView(e.x, e.y, e.z || 0); return [v[0], v[1] - h]; };
 
 function onStrike(p) {
   const fx = Math.cos(p.angle), fy = Math.sin(p.angle);
@@ -165,8 +170,25 @@ function render() {
 
   const list = world.drawables(view, player);
   drawn = list.length;
-  list.push({ key: sortKey(player.x, player.y), draw: (g) => paintPlayer(g, player.pose, player.trail) });
-  list.push({ key: sortKey(capy.x, capy.y), draw: (g) => paintCapybara(g, capy.pose) });
+  // entidades sobem com o chão; logo depois, o terreno da frente é redesenhado por cima (oclusão)
+  const entity = (e, paint, top) => (g) => {
+    g.save();
+    g.translate(0, -e.z * Z_K);
+    paint(g);
+    g.restore();
+    const wall = world.occlude(g, e.x, e.y, e.z, top);
+    if (wall) {
+      // silhueta translúcida atrás da parede ("raio-X"): o jogador nunca some
+      g.save();
+      g.clip(wall);
+      g.globalAlpha = 0.38;
+      g.translate(0, -e.z * Z_K);
+      paint(g);
+      g.restore();
+    }
+  };
+  list.push({ key: sortKey(player.x, player.y), draw: entity(player, (g) => paintPlayer(g, player.pose, player.trail), 100) });
+  list.push({ key: sortKey(capy.x, capy.y), draw: entity(capy, (g) => paintCapybara(g, capy.pose), 60) });
   list.sort((a, b) => a.key - b.key);
   for (const d of list) d.draw(ctx);
   const rect = world.viewToGroundRect(view, 400);

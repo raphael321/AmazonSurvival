@@ -1,9 +1,10 @@
 import { SCHEMA, DEFAULTS, T } from '../world/gen.js';
 
-// Debugger do mundo (F1 ou `): edita os parâmetros do ruído ao vivo, mostra métricas,
-// minimapa do ruído, grade de chunks e modo voo. Os parâmetros ficam salvos no navegador.
+// Debugger do mundo (F1 ou `): painel no estilo Tweakpane com pastas recolhíveis,
+// controle deslizante + caixa numérica, métricas de streaming, minimapa com relevo
+// sombreado, grade de chunks/tiles e modo voo. Parâmetros salvos no navegador.
 
-const STORE = 'amazon-survival:world-params';
+const STORE = 'amazon-survival:world-params:v2';
 
 export function loadParams() {
   try {
@@ -19,39 +20,45 @@ function saveParams(p) {
 
 const CSS = `
 #dbg-toggle{position:fixed;right:max(12px,env(safe-area-inset-right,0px));bottom:max(12px,env(safe-area-inset-bottom,0px));z-index:20;
-  font:600 13px "Trebuchet MS",system-ui,sans-serif;color:#f4ead2;background:#3a2a1c;border:2px solid #1d1a12;border-radius:6px;padding:7px 12px;cursor:pointer}
-#dbg{position:fixed;top:0;right:0;bottom:0;width:min(330px,92vw);z-index:21;overflow-y:auto;box-sizing:border-box;
-  padding:14px max(14px,env(safe-area-inset-right,0px)) 18px 14px;background:rgba(29,22,14,0.94);border-left:3px solid #1d1a12;
-  color:#f4ead2;font:13px/1.35 "Trebuchet MS",system-ui,sans-serif;display:flex;flex-direction:column;gap:12px}
-#dbg[hidden]{display:none!important}
-#dbg h2{margin:0;font-size:15px;color:#d9c08a;letter-spacing:.04em;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
-#dbg h3{margin:0 0 6px;font-size:11px;color:#d9c08a;letter-spacing:.08em;text-transform:uppercase;opacity:.85}
-#dbg .stats{font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;background:rgba(0,0,0,.35);border-radius:6px;padding:8px;white-space:pre;font-variant-numeric:tabular-nums}
-#dbg .row{display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center;margin-bottom:6px}
-#dbg .row label{min-width:0}
-#dbg .row output{font:12px ui-monospace,Menlo,Consolas,monospace;color:#d9c08a;font-variant-numeric:tabular-nums}
-#dbg .row input[type=range]{grid-column:1/3;width:100%;accent-color:#d9c08a}
-#dbg .toggles{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-#dbg .toggles label{display:flex;gap:6px;align-items:center;cursor:pointer}
-#dbg .btns{display:flex;flex-wrap:wrap;gap:6px}
-#dbg button{font:600 12px "Trebuchet MS",system-ui,sans-serif;color:#f4ead2;background:#5a4128;border:2px solid #1d1a12;border-radius:5px;padding:6px 10px;cursor:pointer}
-#dbg button:hover{background:#6b4a2e}
-#dbg button:focus-visible,#dbg input:focus-visible,#dbg-toggle:focus-visible{outline:2px solid #f2c46b;outline-offset:2px}
-#dbg canvas{width:100%;max-width:300px;aspect-ratio:1;image-rendering:pixelated;border:2px solid #1d1a12;border-radius:6px;align-self:center}
-#dbg .legend{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:11px;opacity:.85}
-#dbg .legend i{display:inline-block;width:9px;height:9px;margin-right:4px;border:1px solid #1d1a12;vertical-align:-1px}
+  font:600 12px ui-monospace,Menlo,Consolas,monospace;color:#c8ccd4;background:#1e2127;border:1px solid #2f343d;border-radius:6px;padding:7px 11px;cursor:pointer}
+#dbg{position:fixed;top:max(10px,env(safe-area-inset-top,0px));right:max(10px,env(safe-area-inset-right,0px));z-index:21;width:min(300px,calc(100vw - 20px));
+  max-height:calc(100% - 20px);overflow-y:auto;box-sizing:border-box;background:#1e2127;border:1px solid #2f343d;border-radius:8px;
+  color:#c8ccd4;font:11px/1.3 ui-monospace,Menlo,Consolas,monospace;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+#dbg[hidden],#dbg .body[hidden]{display:none!important}
+#dbg .bar{display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:#262a31;border-bottom:1px solid #2f343d;position:sticky;top:0;z-index:1}
+#dbg .bar b{font-weight:700;color:#e3e6ea;letter-spacing:.02em}
+#dbg .bar button{background:none;border:0;color:#8b919c;font:inherit;cursor:pointer;padding:2px 6px;border-radius:4px}
+#dbg .bar button:hover{background:#30353e;color:#e3e6ea}
+#dbg details{border-top:1px solid #2a2e36}
+#dbg details details{border-top:0;margin-left:8px}
+#dbg summary{cursor:pointer;list-style:none;padding:6px 8px;font-weight:700;color:#e3e6ea;user-select:none}
+#dbg summary::-webkit-details-marker{display:none}
+#dbg summary::before{content:"▸";display:inline-block;width:12px;color:#8b919c;transition:transform .12s}
+#dbg details[open]>summary::before{transform:rotate(90deg)}
+#dbg .row{display:grid;grid-template-columns:86px 1fr 52px;gap:6px;align-items:center;padding:3px 8px 3px 20px}
+#dbg .row label{color:#9aa0aa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#dbg input[type=range]{width:100%;min-width:0;accent-color:#3d8bfd;margin:0}
+#dbg input[type=number]{width:100%;box-sizing:border-box;background:#2a2e36;border:1px solid #353a44;border-radius:4px;color:#e3e6ea;font:inherit;padding:3px 4px;text-align:right;font-variant-numeric:tabular-nums}
+#dbg input[type=number]::-webkit-inner-spin-button{opacity:.4}
+#dbg .stats{margin:6px 8px;padding:7px 8px;background:#15171b;border-radius:6px;white-space:pre;font-variant-numeric:tabular-nums;color:#b5bac3}
+#dbg .toggles{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;padding:4px 8px 8px 20px}
+#dbg .toggles label{display:flex;gap:6px;align-items:center;cursor:pointer;color:#9aa0aa}
+#dbg .btns{display:flex;flex-wrap:wrap;gap:6px;padding:8px}
+#dbg .btns button{font:inherit;color:#e3e6ea;background:#2f343d;border:1px solid #3a404b;border-radius:5px;padding:5px 9px;cursor:pointer}
+#dbg .btns button:hover{background:#3a404b}
+#dbg button:focus-visible,#dbg input:focus-visible,#dbg summary:focus-visible,#dbg-toggle:focus-visible{outline:2px solid #3d8bfd;outline-offset:1px}
+#dbg canvas{display:block;width:calc(100% - 16px);margin:4px 8px 8px;aspect-ratio:1;image-rendering:pixelated;border-radius:6px;background:#15171b}
 `;
 
-const MAP_COLORS = { water: [138, 106, 58], deep: [74, 58, 34], floor: [96, 90, 54], mound: [125, 138, 82], high: [163, 173, 106], forest: [31, 51, 36] };
-const MAP_TILES = 128;
+const MAP = 128;
 
 export class DebugPanel {
   constructor({ params, onChange, toggles }) {
     this.params = { ...params };
     this.onChange = onChange;
-    this.toggles = toggles; // { grid, fly, minimap, light } -> valores iniciais
-    this.build();
+    this.toggles = toggles;
     this.timer = 0;
+    this.build();
     addEventListener('keydown', (e) => {
       if (e.code === 'F1' || e.code === 'Backquote') {
         e.preventDefault();
@@ -68,31 +75,38 @@ export class DebugPanel {
     const btn = document.createElement('button');
     btn.id = 'dbg-toggle';
     btn.type = 'button';
-    btn.textContent = 'Debug (F1)';
+    btn.textContent = 'Debug (`)';
     btn.addEventListener('click', () => this.toggle());
     document.body.appendChild(btn);
 
     const el = document.createElement('aside');
     el.id = 'dbg';
     el.hidden = true;
-    el.innerHTML = `<h2>Debugger do mundo <button type="button" data-act="close" aria-label="Fechar">✕</button></h2>
-      <div class="stats" aria-live="off">…</div>
-      <div><h3>Minimapa do ruído (${MAP_TILES}×${MAP_TILES} tiles)</h3><canvas width="${MAP_TILES}" height="${MAP_TILES}"></canvas>
-      <div class="legend"><span><i style="background:rgb(${MAP_COLORS.floor})"></i>chão</span><span><i style="background:rgb(${MAP_COLORS.mound})"></i>morrote</span><span><i style="background:rgb(${MAP_COLORS.high})"></i>morrote alto</span><span><i style="background:rgb(${MAP_COLORS.forest})"></i>mata fechada</span><span><i style="background:rgb(${MAP_COLORS.water})"></i>rio</span><span><i style="background:#e3743b"></i>você</span></div></div>
-      <div class="toggles">
-        <label><input type="checkbox" id="dbg-grid"> Grade de chunks</label>
-        <label><input type="checkbox" id="dbg-fly"> Modo voo</label>
-        <label><input type="checkbox" id="dbg-light"> Raios de sol</label>
-        <label><input type="checkbox" id="dbg-tiles"> Grade de tiles</label>
-      </div>
-      <div class="groups"></div>
-      <div class="btns">
-        <button type="button" data-act="seed">Nova seed</button>
-        <button type="button" data-act="reset">Restaurar padrão</button>
-        <button type="button" data-act="copy">Copiar parâmetros</button>
+    el.innerHTML = `
+      <div class="bar"><b>Mundo</b><span><button type="button" data-act="fold" aria-label="Recolher">—</button><button type="button" data-act="close" aria-label="Fechar">✕</button></span></div>
+      <div class="body">
+        <details open><summary>Monitor</summary>
+          <div class="stats">…</div>
+          <canvas width="${MAP}" height="${MAP}" aria-label="Minimapa do relevo"></canvas>
+        </details>
+        <details><summary>Visualização</summary>
+          <div class="toggles">
+            <label><input type="checkbox" id="dbg-grid"> chunks</label>
+            <label><input type="checkbox" id="dbg-tiles"> tiles</label>
+            <label><input type="checkbox" id="dbg-fly"> modo voo</label>
+            <label><input type="checkbox" id="dbg-light"> raios de sol</label>
+          </div>
+        </details>
+        <div class="folders"></div>
+        <div class="btns">
+          <button type="button" data-act="seed">Nova seed</button>
+          <button type="button" data-act="reset">Padrão</button>
+          <button type="button" data-act="copy">Copiar JSON</button>
+        </div>
       </div>`;
     document.body.appendChild(el);
     this.el = el;
+    this.body = el.querySelector('.body');
     this.statsEl = el.querySelector('.stats');
     this.map = el.querySelector('canvas');
 
@@ -102,52 +116,79 @@ export class DebugPanel {
       cb.addEventListener('change', () => { this.toggles[id] = cb.checked; });
     }
 
-    const groups = el.querySelector('.groups');
-    let current = null;
+    // pastas e subpastas a partir do SCHEMA
+    const host = el.querySelector('.folders');
+    const folders = {};
     this.inputs = {};
     for (const s of SCHEMA) {
-      if (s.group !== current) {
-        current = s.group;
-        const g = document.createElement('div');
-        g.innerHTML = `<h3>${s.group}</h3>`;
-        groups.appendChild(g);
-        this.groupEl = g;
+      if (!folders[s.folder]) {
+        const d = document.createElement('details');
+        d.open = s.folder === 'Terreno';
+        d.innerHTML = `<summary>${s.folder}</summary>`;
+        host.appendChild(d);
+        folders[s.folder] = { el: d, subs: {} };
+      }
+      const f = folders[s.folder];
+      if (!f.subs[s.sub]) {
+        const d = document.createElement('details');
+        d.open = true;
+        d.innerHTML = `<summary>${s.sub}</summary>`;
+        f.el.appendChild(d);
+        f.subs[s.sub] = d;
       }
       const row = document.createElement('div');
       row.className = 'row';
-      row.innerHTML = `<label for="dbg-${s.key}">${s.label}</label><output id="dbg-${s.key}-v"></output>
-        <input type="range" id="dbg-${s.key}" min="${s.min}" max="${s.max}" step="${s.step}">`;
-      this.groupEl.appendChild(row);
-      const input = row.querySelector('input'), out = row.querySelector('output');
-      input.value = this.params[s.key];
-      const show = () => { out.textContent = fmt(+input.value, s); };
+      const title = s.unit ? `${s.label} (${s.unit})` : s.label;
+      row.innerHTML = `<label for="dbg-${s.key}" title="${title}">${s.label}</label>
+        <input type="range" id="dbg-${s.key}" min="${s.min}" max="${s.max}" step="${s.step}" aria-label="${title}">
+        <input type="number" id="dbg-${s.key}-n" min="${s.min}" max="${s.max}" step="${s.step}" aria-label="${title} (valor)">`;
+      f.subs[s.sub].appendChild(row);
+      const range = row.querySelector('input[type=range]'), num = row.querySelector('input[type=number]');
+      const dec = s.step < 0.01 ? 3 : s.step < 0.1 ? 2 : s.step < 1 ? 1 : 0;
+      const show = () => {
+        range.value = this.params[s.key];
+        num.value = (+this.params[s.key]).toFixed(dec);
+      };
       show();
-      input.addEventListener('input', () => {
-        this.params[s.key] = +input.value;
-        show();
+      range.addEventListener('input', () => {
+        this.params[s.key] = +range.value;
+        num.value = (+range.value).toFixed(dec);
         this.changed();
       });
-      this.inputs[s.key] = { input, show };
+      // caixa numérica aceita valores fora da faixa do controle (para experimentar)
+      num.addEventListener('change', () => {
+        const v = parseFloat(num.value);
+        if (!Number.isFinite(v)) { show(); return; }
+        this.params[s.key] = v;
+        range.value = v;
+        this.changed(true);
+      });
+      this.inputs[s.key] = { show };
     }
 
     el.addEventListener('click', (e) => {
       const act = e.target.closest('[data-act]')?.dataset.act;
       if (act === 'close') this.toggle(false);
+      if (act === 'fold') this.body.hidden = !this.body.hidden;
       if (act === 'seed') this.set({ seed: 1 + Math.floor(Math.random() * 99998) });
       if (act === 'reset') this.set({ ...DEFAULTS });
       if (act === 'copy') {
         const txt = JSON.stringify(this.params, null, 2);
-        navigator.clipboard?.writeText(txt).then(() => this.flash('Parâmetros copiados'), () => this.flash('Não deu para copiar'));
+        const p = navigator.clipboard?.writeText(txt);
+        if (p) p.then(() => this.flash('JSON copiado'), () => this.flash('Não deu para copiar'));
       }
     });
-    // teclas do jogo não devem disparar enquanto se mexe num controle do painel
-    // setas mexem no controle deslizante sem andar com o personagem
-    el.addEventListener('keydown', (e) => { if (e.target.type === 'range' && e.code.startsWith('Arrow')) e.stopPropagation(); });
+    // teclas digitadas no painel não andam com o personagem
+    el.addEventListener('keydown', (e) => {
+      if (e.code === 'F1' || e.code === 'Backquote') return;
+      const t = e.target;
+      if (t.type === 'number' || (t.type === 'range' && e.code.startsWith('Arrow'))) e.stopPropagation();
+    });
   }
 
   set(p) {
     Object.assign(this.params, p);
-    for (const [k, { input, show }] of Object.entries(this.inputs)) { input.value = this.params[k]; show(); }
+    for (const { show } of Object.values(this.inputs)) show();
     this.changed(true);
   }
 
@@ -155,7 +196,7 @@ export class DebugPanel {
     clearTimeout(this.debounce);
     const fire = () => { saveParams(this.params); this.onChange({ ...this.params }); };
     if (now) fire();
-    else this.debounce = setTimeout(fire, 140);
+    else this.debounce = setTimeout(fire, 120);
   }
 
   flash(msg) {
@@ -165,7 +206,6 @@ export class DebugPanel {
 
   toggle(v) {
     this.el.hidden = v === undefined ? !this.el.hidden : !v;
-    // ao fechar, devolve o teclado para o jogo
     if (this.el.hidden && this.el.contains(document.activeElement)) document.activeElement.blur();
   }
 
@@ -173,56 +213,61 @@ export class DebugPanel {
     return !this.el.hidden;
   }
 
-  // chamado todo quadro; atualiza o texto e o minimapa poucas vezes por segundo
   update(dt, info, world, player) {
-    if (!this.open) return;
+    if (!this.open || this.body.hidden) return;
     this.timer -= dt;
     if (this.timer > 0) return;
     this.timer = 0.25;
+    const g = world.gen, s = world.stats;
     const ti = Math.floor(player.x / T), tj = Math.floor(player.y / T);
-    const g = world.gen;
-    const bio = g.h(ti, tj) < 0 ? 'rio' : g.isForest(ti, tj) ? 'mata fechada' : g.h(ti, tj) > 0 ? 'morrote' : 'chão de várzea';
+    const h = g.h(ti, tj);
+    const bio = h < 0 ? 'água' : g.isForest(ti, tj) ? 'mata fechada' : h >= g.rockLevel ? 'rocha' : 'chão';
     let txt =
-      `FPS            ${info.fps.toFixed(0)}\n` +
-      `tile           ${ti}, ${tj}  (${bio})\n` +
-      `chunks         ${world.chunks.size} na memória (${(world.stats.chunkMB || 0).toFixed(0)} MB, escala ${world.rs})\n` +
-      `fila           ${world.stats.queue} esperando\n` +
-      `pintura        ${world.stats.paintMs.toFixed(1)} ms/chunk  (${(world.stats.frameMs || 0).toFixed(1)} ms neste quadro)\n` +
-      `em andamento   ${world.jobs.size} chunk(s)\n` +
-      `pintados       ${world.stats.painted}   descartados ${world.stats.evicted}\n` +
-      `blocos         ${world.blocks.size}   sprites ${world.bank.size}\n` +
-      `objetos à vista ${info.drawn}`;
+      `fps        ${info.fps.toFixed(0)}\n` +
+      `tile       ${ti}, ${tj}  nível ${h}  ${bio}\n` +
+      `chunks     ${world.chunks.size}  ${(s.chunkMB || 0).toFixed(0)} MB  escala ${world.rs}\n` +
+      `fila       ${s.queue}  pintando ${world.jobs.size}\n` +
+      `pintura    ${s.paintMs.toFixed(1)} ms/chunk  ${(s.frameMs || 0).toFixed(1)} ms/quadro\n` +
+      `total      ${s.painted} pintados  ${s.evicted} descartados\n` +
+      `objetos    ${info.drawn} na tela  ${world.bank.size} sprites`;
     if (this.flashMsg && performance.now() < this.flashUntil) txt += `\n${this.flashMsg}`;
     this.statsEl.textContent = txt;
     this.drawMap(world, player);
   }
 
+  // minimapa: cor por altitude + sombreamento por inclinação (luz do noroeste)
   drawMap(world, player) {
     const g = world.gen;
     const ctx = this.map.getContext('2d');
-    const img = ctx.createImageData(MAP_TILES, MAP_TILES);
-    const ci = Math.floor(player.x / T) - MAP_TILES / 2, cj = Math.floor(player.y / T) - MAP_TILES / 2;
-    for (let y = 0; y < MAP_TILES; y++)
-      for (let x = 0; x < MAP_TILES; x++) {
+    const img = ctx.createImageData(MAP, MAP);
+    const ci = Math.floor(player.x / T) - MAP / 2, cj = Math.floor(player.y / T) - MAP / 2;
+    const top = Math.max(1, g.maxLand);
+    for (let y = 0; y < MAP; y++)
+      for (let x = 0; x < MAP; x++) {
         const i = ci + x, j = cj + y;
         const h = g.h(i, j);
         let c;
-        if (h < 0) c = g.deep(i, j) > 0.5 ? MAP_COLORS.deep : MAP_COLORS.water;
-        else if (g.isForest(i, j)) c = MAP_COLORS.forest;
-        else c = h === 2 ? MAP_COLORS.high : h === 1 ? MAP_COLORS.mound : MAP_COLORS.floor;
-        const k = (y * MAP_TILES + x) * 4;
-        img.data[k] = c[0];
-        img.data[k + 1] = c[1];
-        img.data[k + 2] = c[2];
-        img.data[k + 3] = 255;
+        if (h < 0) {
+          const d = g.deep(i, j);
+          c = [138 - 60 * d, 110 - 45 * d, 64 - 25 * d];
+        } else {
+          const f = h / top;
+          if (h >= g.rockLevel) c = [128 + 40 * f, 122 + 36 * f, 100 + 30 * f];
+          else if (g.isForest(i, j)) c = [38, 62, 40];
+          else c = [92 + 10 * f, 98 + 30 * f, 56 + 6 * f];
+          // relevo sombreado: diferença de altura com o vizinho do noroeste
+          const slope = h - Math.max(0, g.h(i - 1, j - 1));
+          const k = 1 + Math.max(-0.35, Math.min(0.35, slope * 0.18));
+          c = c.map((v) => v * k);
+        }
+        const o = (y * MAP + x) * 4;
+        img.data[o] = c[0];
+        img.data[o + 1] = c[1];
+        img.data[o + 2] = c[2];
+        img.data[o + 3] = 255;
       }
     ctx.putImageData(img, 0, 0);
-    ctx.fillStyle = '#e3743b';
-    ctx.fillRect(MAP_TILES / 2 - 1, MAP_TILES / 2 - 1, 3, 3);
+    ctx.fillStyle = '#ff5a3c';
+    ctx.fillRect(MAP / 2 - 1, MAP / 2 - 1, 3, 3);
   }
-}
-
-function fmt(v, s) {
-  const d = s.step < 0.01 ? 3 : s.step < 1 ? 2 : 0;
-  return v.toFixed(d) + (s.unit ? ' ' + s.unit : '');
 }

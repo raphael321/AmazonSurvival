@@ -1,8 +1,8 @@
 import { P, sortKey, groundFromView } from '../engine/projection.js';
 import { paintSamauma, paintAcai, paintBush, paintRock, paintForestTree, drawFruit } from '../art/scenery.js';
 import { drawSprite, drawSwaying, tintSprite } from '../art/sprite.js';
-import { Gen, T, BLOCK, DEFAULTS } from './gen.js';
-import { CHUNK, chunkPainter, drawWater } from './terrain.js';
+import { Gen, T, BLOCK, DEFAULTS, HL } from './gen.js';
+import { CHUNK, chunkPainter, drawWater, tileTopZ } from './terrain.js';
 
 const CHUNK_BUDGET_MB = 160; // memória máxima dos chunks de chão (LRU)
 const MAX_BLOCKS = 160; // limite de blocos de objetos (LRU)
@@ -31,9 +31,16 @@ export class World {
 
   // ---------- consulta de tiles ----------
   h(i, j) { return this.gen.h(i, j); }
+  // nível do chão (-1 = água) e se dá para pisar
+  level(x, y) {
+    return this.gen.h(Math.floor(x / T), Math.floor(y / T));
+  }
   walkable(x, y) {
     const i = Math.floor(x / T), j = Math.floor(y / T);
-    return this.gen.h(i, j) === 0 && !this.gen.isForest(i, j);
+    return this.gen.h(i, j) >= 0 && !this.gen.isForest(i, j);
+  }
+  groundZ(x, y) {
+    return Math.max(0, this.level(x, y)) * HL;
   }
 
   // procura em espiral um tile andável e com folga em volta
@@ -73,7 +80,8 @@ export class World {
 
   // ---------- sprites compartilhados (variante × nível de luz) ----------
   setScale(rs) {
-    if (rs === this.rs) return;
+    if (rs === this.rs && this.chunks.size) return;
+    this.jobs.clear();
     this.rs = rs;
     this.groundRs = rs;
     this.chunks.clear();
@@ -136,9 +144,15 @@ export class World {
     const wanted = new Set(want.map((w) => w.k));
     for (const k of this.jobs.keys()) if (!wanted.has(k)) this.jobs.delete(k);
 
+    // com zoom afastado podem faltar muitos visíveis de uma vez: aí eles também entram no
+    // orçamento (aparecem em poucos quadros) em vez de travar a tela num quadro só
+    const missingVisible = want.filter((w) => w.visible).length;
+    const strict = missingVisible > 6;
+    const budget = strict ? Math.max(budgetMs, 12) : budgetMs;
     const t0 = performance.now();
     for (const w of want) {
-      if (!w.visible && performance.now() - t0 > budgetMs) break;
+      const capped = !w.visible || strict;
+      if (capped && performance.now() - t0 > budget) break;
       let job = this.jobs.get(w.k);
       if (!job) {
         job = { it: chunkPainter(this, w.ix, w.iy, this.groundRs), ms: 0 };
@@ -155,7 +169,7 @@ export class World {
           this.stats.painted++;
           break;
         }
-        if (!w.visible && performance.now() - t0 > budgetMs) break;
+        if (capped && performance.now() - t0 > budget) break;
       }
     }
     this.stats.queue = want.length;
@@ -193,7 +207,10 @@ export class World {
 
   resolve(e, rad, px, py) {
     if (e.noclip) return;
-    const ok = (x, y) => this.walkable(x - rad, y) && this.walkable(x + rad, y) && this.walkable(x, y - rad) && this.walkable(x, y + rad);
+    // sobe ou desce um nível por vez (degrau); paredão de 2+ níveis bloqueia
+    const cur = this.level(px, py);
+    const step = (x, y) => this.walkable(x, y) && Math.abs(this.level(x, y) - cur) <= 1;
+    const ok = (x, y) => step(x - rad, y) && step(x + rad, y) && step(x, y - rad) && step(x, y + rad);
     if (!ok(e.x, e.y)) {
       if (ok(e.x, py)) e.y = py;
       else if (ok(px, e.y)) e.x = px;
@@ -210,7 +227,8 @@ export class World {
   }
 
   isFree(x, y, rad) {
-    for (const [dx, dy] of [[-rad, 0], [rad, 0], [0, -rad], [0, rad], [0, 0]]) if (!this.walkable(x + dx, y + dy)) return false;
+    const lv = this.level(x, y);
+    for (const [dx, dy] of [[-rad, 0], [rad, 0], [0, -rad], [0, rad], [0, 0]]) if (!this.walkable(x + dx, y + dy) || this.level(x + dx, y + dy) !== lv) return false;
     return this.collidersNear(x, y).every((c) => Math.hypot(x - c.x, y - c.y) > c.collider + rad);
   }
 
@@ -237,7 +255,7 @@ export class World {
     const out = [];
     const pv = P([player.x, player.y, 40]);
     for (const p of this.propsIn(...this.viewToGroundRect(view))) {
-      const [vx, vy] = P([p.x, p.y, 0]);
+      const [vx, vy] = P([p.x, p.y, p.z || 0]);
       // descarte pela caixa real do sprite (altura acima da base e meia-largura)
       const [top, hw] = EXTENT[p.kind];
       if (vx + hw < view.x0 || vx - hw > view.x1 || vy - top > view.y1 || vy + 40 < view.y0) continue;
@@ -275,6 +293,45 @@ export class World {
     } else if (p.kind === 'rock') {
       drawSprite(ctx, a.sprite, vx, vy);
     }
+  }
+
+  // ---------- oclusão do terreno ----------
+  // Blocos mais altos NA FRENTE de uma entidade devem cobri-la. O chão é um cache, então
+  // redesenhamos só essas colunas por cima, recortando o chunk pela silhueta de cada coluna.
+  occlude(ctx, ex, ey, ez, top = 100, half = 34) {
+    const g = this.gen;
+    const ti = Math.floor(ex / T), tj = Math.floor(ey / T);
+    const [vx, vy] = P([ex, ey, ez]);
+    const box = { x0: vx - half, x1: vx + half, y0: vy - top, y1: vy + 12 };
+    const K = g.maxLand + 3;
+    const path = new Path2D();
+    let any = false, bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+    for (let j = tj - 1; j <= tj + K; j++)
+      for (let i = ti - 1; i <= ti + K; i++) {
+        if (i + j <= ti + tj) continue; // só o que está na frente
+        const zt = tileTopZ(g, i, j);
+        if (zt <= ez + 2) continue;
+        const x0 = i * T, y0 = j * T, x1 = x0 + T, y1 = y0 + T, zb = ez;
+        const pts = [P([x0, y0, zt]), P([x1, y0, zt]), P([x1, y0, zb]), P([x1, y1, zb]), P([x0, y1, zb]), P([x0, y1, zt])];
+        const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+        const px0 = Math.min(...xs), px1 = Math.max(...xs), py0 = Math.min(...ys), py1 = Math.max(...ys);
+        if (px1 < box.x0 || px0 > box.x1 || py1 < box.y0 || py0 > box.y1) continue;
+        path.moveTo(pts[0][0], pts[0][1]);
+        for (let k = 1; k < pts.length; k++) path.lineTo(pts[k][0], pts[k][1]);
+        path.closePath();
+        any = true;
+        bx0 = Math.min(bx0, px0); by0 = Math.min(by0, py0); bx1 = Math.max(bx1, px1); by1 = Math.max(by1, py1);
+      }
+    if (!any) return null;
+    ctx.save();
+    ctx.clip(path);
+    for (let iy = Math.floor(by0 / CHUNK); iy <= Math.floor(by1 / CHUNK); iy++)
+      for (let ix = Math.floor(bx0 / CHUNK); ix <= Math.floor(bx1 / CHUNK); ix++) {
+        const c = this.chunks.get(ix + ',' + iy);
+        if (c) ctx.drawImage(c.canvas, ix * CHUNK, iy * CHUNK, CHUNK + 0.5, CHUNK + 0.5);
+      }
+    ctx.restore();
+    return path;
   }
 
   // ---------- interação ----------

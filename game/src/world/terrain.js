@@ -1,11 +1,10 @@
 import { INK } from '../art/palette.js';
 import { rng } from '../engine/math.js';
 import { P, groundFromView } from '../engine/projection.js';
-import { T } from './gen.js';
+import { T, HL } from './gen.js';
 
 // Terreno isométrico com altura, gerado sob demanda e pintado em chunks de vista (512 px).
-export { T };
-export const HL = 30; // altura de um nível
+export { T, HL };
 export const CHUNK = 512;
 export const BG = '#0b110c';
 export const WATER_Z = -0.55 * HL;
@@ -32,11 +31,11 @@ function quad(ctx, pts) {
 }
 
 // Face lateral (barranco): camadas de terra, raízes penduradas, contorno de tinta.
-function paintFace(ctx, a, b, ztop, zbot, side, r, isWater) {
+function paintFace(ctx, a, b, ztop, zbot, side, r, isWater, rocky) {
   const A = P([a[0], a[1], ztop]), B = P([b[0], b[1], ztop]);
   const Bd = P([b[0], b[1], zbot]), Ad = P([a[0], a[1], zbot]);
   const lit = side === 'south'; // face baixo-esquerda recebe a luz do topo-esquerda
-  const base = isWater ? (lit ? '#5d4a30' : '#41331f') : lit ? '#7a5a38' : '#4f3a25';
+  const base = isWater ? (lit ? '#5d4a30' : '#41331f') : rocky ? (lit ? '#86806a' : '#5a5646') : lit ? '#7a5a38' : '#4f3a25';
   quad(ctx, [A, B, Bd, Ad]);
   ctx.fillStyle = base;
   ctx.fill();
@@ -60,7 +59,7 @@ function paintFace(ctx, a, b, ztop, zbot, side, r, isWater) {
     ctx.ellipse(p[0], p[1], 2.6, 1.6, 0, 0, Math.PI * 2);
     ctx.fill();
   }
-  if (!isWater) {
+  if (!isWater && !rocky) {
     ctx.lineCap = 'round';
     for (let k = 0; k < 2; k++) {
       if (r() < 0.45) continue;
@@ -125,6 +124,35 @@ function fern(ctx, x, y, s, r) {
 function tileDecor(ctx, i, j, z, r, kind) {
   const x0 = i * T, y0 = j * T;
   const at = (u, v) => P([x0 + u * T, y0 + v * T, z]);
+  if (kind === 'rock') {
+    // rocha: rachaduras e cascalho no lugar de folhas
+    ctx.lineCap = 'round';
+    for (let k = 0; k < 2; k++) {
+      const p = at(0.15 + r() * 0.5, 0.15 + r() * 0.5), q = at(0.4 + r() * 0.5, 0.4 + r() * 0.5);
+      ctx.strokeStyle = 'rgba(29,26,18,0.55)';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(p[0], p[1]);
+      ctx.lineTo((p[0] + q[0]) / 2 + (r() - 0.5) * 8, (p[1] + q[1]) / 2);
+      ctx.lineTo(q[0], q[1]);
+      ctx.stroke();
+    }
+    for (let k = 0; k < 5; k++) {
+      const p = at(0.1 + r() * 0.8, 0.1 + r() * 0.8);
+      ctx.fillStyle = r() < 0.5 ? '#a6a084' : '#5f5c4c';
+      ctx.beginPath();
+      ctx.ellipse(p[0], p[1], 2.2, 1.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (r() < 0.3) {
+      const p = at(0.3 + r() * 0.4, 0.3 + r() * 0.4);
+      ctx.fillStyle = '#4a6a38';
+      ctx.beginPath();
+      ctx.ellipse(p[0], p[1], 8, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return;
+  }
   if (kind === 'forest') {
     for (let k = 0; k < 5; k++) {
       const p = at(0.1 + r() * 0.8, 0.1 + r() * 0.8);
@@ -187,16 +215,18 @@ function paintTile(ctx, gen, i, j, seed) {
 
   // faces visíveis (leste e sul) onde o vizinho é mais baixo
   const ze = tileTopZ(gen, i + 1, j), zs = tileTopZ(gen, i, j + 1);
-  if (zs < z) paintFace(ctx, [x0, y1], [x1, y1], z, zs, 'south', r, water);
-  if (ze < z) paintFace(ctx, [x1, y1], [x1, y0], z, ze, 'east', r, water);
+  const rocky = h >= gen.rockLevel;
+  if (zs < z) paintFace(ctx, [x0, y1], [x1, y1], z, zs, 'south', r, water, rocky);
+  if (ze < z) paintFace(ctx, [x1, y1], [x1, y0], z, ze, 'east', r, water, rocky);
 
   const top = [P([x0, y0, z]), P([x1, y0, z]), P([x1, y1, z]), P([x0, y1, z])];
   const forest = !water && gen.isForest(i, j);
   let col;
   if (water) col = mix('#8a6a3a', '#4a3a22', gen.deep(i, j));
   else if (forest) col = mix('#2b3524', '#3a4630', r());
-  else if (h > 0) col = mix(h > 1 ? '#6b7a48' : '#5f7444', '#6d7c48', r());
-  else col = mix(mix('#6e5634', '#4d6238', (gen.reliefAt(i * 0.6, j * 0.6) + 1) / 2), '#000000', r() * 0.08);
+  else if (rocky) col = mix('#7d7864', '#938d74', r());
+  else if (h > 0) col = mix(mix('#5d5a36', '#4a6a3a', Math.min(1, h / gen.rockLevel)), '#000000', r() * 0.08);
+  else col = mix(mix('#6e5634', '#4d6238', (gen.forestAt(i * 2.3, j * 2.3) + 1) / 2), '#000000', r() * 0.08);
   quad(ctx, top);
   ctx.fillStyle = col;
   ctx.fill();
@@ -224,7 +254,7 @@ function paintTile(ctx, gen, i, j, seed) {
     }
     return;
   }
-  tileDecor(ctx, i, j, z, r, forest ? 'forest' : h > 0 ? 'mound' : 'floor');
+  tileDecor(ctx, i, j, z, r, forest ? 'forest' : rocky ? 'rock' : h > 0 ? 'mound' : 'floor');
   if (zs < z || ze < z) {
     ctx.lineWidth = 2;
     ctx.strokeStyle = 'rgba(244,234,210,0.18)';
@@ -308,7 +338,9 @@ export function* chunkPainter(world, ix, iy, rs) {
   ctx.clip();
 
   // faixa de vista que pode afetar o chunk: tiles altos sobem ~60px, faces descem ~70px
-  const vx0 = cx - 60, vx1 = cx + CHUNK + 60, vy0 = cy - 90, vy1 = cy + CHUNK + 90;
+  // tiles altos sobem na tela e paredões descem: a margem cresce com a altura máxima do mundo
+  const zMax = (gen.maxLand + 1) * HL * 0.86;
+  const vx0 = cx - 60, vx1 = cx + CHUNK + 60, vy0 = cy - 90 - zMax, vy1 = cy + CHUNK + 90 + zMax;
   const corners = [[vx0, vy0], [vx1, vy0], [vx1, vy1], [vx0, vy1]].map(([x, y]) => groundFromView(x, y));
   const i0 = Math.floor(Math.min(...corners.map((p) => p[0])) / T), i1 = Math.floor(Math.max(...corners.map((p) => p[0])) / T);
   const j0 = Math.floor(Math.min(...corners.map((p) => p[1])) / T), j1 = Math.floor(Math.max(...corners.map((p) => p[1])) / T);
@@ -330,7 +362,7 @@ export function* chunkPainter(world, ix, iy, rs) {
   const wy0 = Math.min(gy0, gy1, ga[1], gb[1]) - 400, wy1 = Math.max(gy0, gy1, ga[1], gb[1]) + 400;
   const props = world.propsIn(wx0, wy0, wx1, wy1);
   for (const p of props) {
-    const v = P([p.x, p.y, 0]);
+    const v = P([p.x, p.y, p.z || 0]);
     const s = p.shadow || 20;
     ctx.fillStyle = 'rgba(12,16,8,0.32)';
     ctx.beginPath();
