@@ -59,10 +59,17 @@ export class World3D {
     const bodies = this.physics.bodiesNear(e.x, e.y);
     const z = e.z || 0;
     // pisável: terreno bom OU uma malha embaixo do pé (tabuleiro da ponte sobre o rio)
-    const foot = (x, y) => this.walkable(x, y) || (bodies.length > 0 && this.physics.hasFooting(x, y, z, bodies));
-    // caiu na água funda (ex.: pulou da ponte): deixa nadar até sair
-    const swimming = !foot(px, py);
-    const ok = swimming ? () => true : (x, y) => foot(x - rad, y) && foot(x + rad, y) && foot(x, y - rad) && foot(x, y + rad);
+    // água funda: checada em volta do corpo. Inclinação: só no centro e só para SUBIR
+    // (subida / passo dado acima do limite = barranco); descer qualquer encosta é livre.
+    const hHere = this.field.H(px, py);
+    const wet = (x, y) => this.field.H(x, y) < -6 && !(bodies.length > 0 && this.physics.hasFooting(x, y, z, bodies));
+    const climbOk = (x, y) => {
+      if (bodies.length > 0 && this.physics.hasFooting(x, y, z, bodies)) return true; // ponte, pedra, etc.
+      const step = Math.hypot(x - px, y - py);
+      return this.field.H(x, y) - hHere <= this.params.maxSlope * step + 0.5;
+    };
+    const swimming = wet(px, py);
+    const ok = swimming ? () => true : (x, y) => climbOk(x, y) && !wet(x - rad, y) && !wet(x + rad, y) && !wet(x, y - rad) && !wet(x, y + rad);
     if (!ok(e.x, e.y)) {
       if (ok(e.x, py)) e.y = py;
       else if (ok(px, e.y)) e.x = px;

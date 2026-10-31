@@ -55,6 +55,7 @@ Formato: data · decisão · motivo · alternativas descartadas. Atualize sempre
 | 2026-10-31 | Vento mais calmo e natural (rajadas largas e lentas, tremor leve); grama com raio maior (1150) e densidade que cai com a distância | Feedback: "movimentando demais", "raio da grama feio" | — |
 | 2026-10-31 | **Mata fechada andável**: só troncos colidem; árvores espaçadas (no máximo uma por casa de tabuleiro); parâmetros salvos passam para v2 | Feedback: "árvores muito próximas, não dá para passar" | Mata bloqueada |
 | 2026-10-31 | **Peixes no rio**: cardumes pequenos (dourados) e pirarucus raros, a favor da correnteza, só em água funda, saltos com respingo; cauda ondulando no shader | Pedido do Raphael | — |
+| 2026-10-31 | **Inclinação só limita SUBIR** (subida ÷ passo dado no centro do corpo); descer qualquer encosta é livre, acompanhando o chão (encosta muito íngreme = queda com gravidade); água funda checada em volta do corpo | Feedback: "nesse desnível ele não está descendo". Teste: 25 encostas íngremes, nenhuma travada pelo terreno ao descer | Limite de inclinação igual para subir e descer |
 
 ## Dúvidas em aberto
 

@@ -121,6 +121,11 @@ export class Physics {
     const g = this.groundAt(e.x, e.y, e.z);
     if (e.wantJump && e.grounded) e.vz = 360;
     e.wantJump = false;
+    // descendo encosta andando: acompanha o chão (sem "pulinhos"); queda maior vira queda de verdade
+    if (e.vz <= 0 && e.grounded && e.z > g && e.z - g < STEP * 1.2) {
+      e.z = g;
+      return e.z;
+    }
     if (e.vz > 0 || e.z > g + 2) {
       e.vz -= GRAVITY * dt;
       e.z += e.vz * dt;

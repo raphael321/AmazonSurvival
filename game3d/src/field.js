@@ -9,7 +9,7 @@ export const DEFAULTS3D = {
   ...DEFAULTS,
   heightScale: 1.8, // multiplica a altura (1 nível = 30 unidades); alto = vistas com verticalidade
   terrace: 0, // 0 = encosta suave, 1 = degraus de bloco (estilo 2D)
-  maxSlope: 1.1, // inclinação máxima que dá para subir (tangente)
+  maxSlope: 1.5, // inclinação máxima que dá para SUBIR (tangente); descer é livre
   deco: 0.02, // troncos, tocos, ouriços de castanha
   build: 0.01, // construções espalhadas (pré-visualização)
   bridges: 0.75, // chance de ponte em cada trecho de rio (por chunk)
