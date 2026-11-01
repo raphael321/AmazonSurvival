@@ -125,3 +125,10 @@ Formato: data · decisão · motivo · alternativas descartadas. Atualize sempre
 - **Animais**: têm vida e morrem (tombam de lado e ficam 40 s); abater dá carne. Golpe/flecha deixa herbívoro furioso (regra: só revida se atacado). Flechas com gravidade, cravam no chão.
 - **Caverna híbrida** (`cave.js`): boca = modelo do Raphael (sem a placa do chão, ~11 mil triângulos) numa clareira perto do início; terreno com **buraco** (shader descarta) embaixo da boca; túnel (anéis com piso plano) desce por baixo do morro até um **salão** (elipsoide com ruído) com estalactites, estalagmites e cristais com luz. Dentro: física e câmera usam a malha da caverna (terreno vira teto), câmera encosta na rocha, sol some, **tocha** acende.
 - **Bichos da caverna** (`cavelife.js`): **sucuri** (modelo rigado do Raphael, coluna inteira ondula), **aranha-caranguejeira** (8 patas em grupos alternados, pula no bote) e **morcegos** (asas batendo, rasante). Só percebem quem está dentro da caverna.
+
+## 2026-11-01 — Correções da caverna
+
+- Buraco do terreno agora é um **corredor do tamanho do túnel** (começo reto, sem tampa redonda) em vez de um círculo: acabaram os "vazios brancos" dos lados da boca. O túnel começa dentro do arco (a ponta não sai para fora).
+- Fim do túnel: anéis que entravam no salão viravam paredes soltas; agora o túnel atravessa a parede só o necessário e a abertura do salão é do tamanho dele.
+- O modelo da boca é vazado dos dois lados: um maciço de pedra tampa o fundo.
+- Dentro da caverna o céu e a água não são desenhados (nada aparece por frestas).

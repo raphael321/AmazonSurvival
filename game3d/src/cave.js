@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { MeshBVH } from 'three-mesh-bvh';
 import { toonRamp, INK_MATERIAL } from './toon.js';
-import { terrainHole } from './terrain3d.js';
+import { terrainHole, terrainHoleB } from './terrain3d.js';
 import { inflate } from './assets.js';
 
 // Caverna "híbrida": a boca (modelo da Tripo) fica no chão; o terreno ganha um buraco embaixo
@@ -57,7 +57,9 @@ export class Cave {
     // ---- caminho do túnel: entra pela boca descendo forte, faz curva e chega ao salão ----
     const path = [];
     const R = 105; // raio do túnel
-    let x = mx + fx * S * 0.45, y = my + fy * S * 0.45, dir = Math.atan2(iny, inx);
+    const HR0 = 560; // raio do salão (o mesmo de baixo)
+    // começa já dentro do arco (a ponta não sai para fora da boca)
+    let x = mx + fx * S * 0.34, y = my + fy * S * 0.34, dir = Math.atan2(iny, inx);
     // o piso do túnel começa na altura do chão em frente ao arco (o terreno pode descer ali)
     let floor = Math.min(h0, f.H(x, y));
     this.mouthZ = floor - 6;
@@ -87,6 +89,8 @@ export class Cave {
     for (let k = 1; k <= 4; k++) path.push({ x: end.x + Math.cos(end.dir) * 40 * k, y: end.y + Math.sin(end.dir) * 40 * k, floor: end.floor + (hallFloor - end.floor) * (k / 4), dir: end.dir });
     const last = path[path.length - 1];
     const hc = [last.x + Math.cos(last.dir) * HR * 0.85, last.y + Math.sin(last.dir) * HR * 0.85];
+    // dois anéis a mais, já no piso do salão: o túnel atravessa a parede (sem fresta)
+    for (let k = 1; k <= 2; k++) path.push({ x: last.x + Math.cos(last.dir) * 50 * k, y: last.y + Math.sin(last.dir) * 50 * k, floor: hallFloor, dir: last.dir });
     this.path = path;
     this.hall = { x: hc[0], y: hc[1], floor: hallFloor, r: HR, h: HH };
 
@@ -111,14 +115,18 @@ export class Cave {
         pushV(p.x + sx * Math.cos(a) * rw, p.y + sy * Math.cos(a) * rw, cz + up, floorish, n);
       }
     });
+    const hcx = path[path.length - 1].x + Math.cos(path[path.length - 1].dir) * HR0 * 0.85, hcy = path[path.length - 1].y + Math.sin(path[path.length - 1].dir) * HR0 * 0.85;
     for (let i = 0; i < path.length - 1; i++)
       for (let k = 0; k < SEG; k++) {
         const a = i * SEG + k, b = i * SEG + ((k + 1) % SEG), c2 = (i + 1) * SEG + k, d = (i + 1) * SEG + ((k + 1) % SEG);
+        // anel que já entrou no salão vira "parede solta" lá dentro: fica de fora
+        const cx = (pos[a * 3] + pos[d * 3]) / 2, cy = (pos[a * 3 + 2] + pos[d * 3 + 2]) / 2;
+        if (Math.hypot(cx - hcx, cy - hcy) < HR0 * 0.62) continue;
         idx.push(a, c2, b, b, c2, d);
       }
     // salão: esfera achatada com ruído; piso plano; abertura onde o túnel chega
     const base = pos.length / 3, NU = 40, NV = 22;
-    const tunnelEnd = path[path.length - 1];
+    const tunnelEnd = path[path.length - 3]; // onde o túnel cruza a parede do salão
     const hallVerts = [];
     for (let v = 0; v <= NV; v++)
       for (let u = 0; u <= NU; u++) {
@@ -138,7 +146,7 @@ export class Cave {
         // abertura: tira as faces perto da boca do túnel
         const q = hallVerts[v * (NU + 1) + u];
         // (só parede: o piso do salão continua inteiro)
-        if (q[2] > hallFloor + 2 && Math.hypot(q[0] - tunnelEnd.x, q[1] - tunnelEnd.y, q[2] - (tunnelEnd.floor + R * 0.5)) < R * 1.3) continue;
+        if (q[2] > hallFloor + 2 && Math.hypot(q[0] - tunnelEnd.x, q[1] - tunnelEnd.y, q[2] - (tunnelEnd.floor + R * 0.5)) < R * 0.92) continue;
         idx.push(a, b, c2, b, d, c2);
       }
     const geo = new THREE.BufferGeometry();
@@ -158,7 +166,15 @@ export class Cave {
     this.decorate();
     // ---- boca: modelo da Tripo, de frente para o início ----
     this.mouth = { x: mx, y: my, z: this.mouthZ, rot: Math.atan2(fx, fy) };
-    terrainHole.value.set(mx, my, S * 0.36);
+    const p0 = path[0];
+    let pB = path[path.length - 1];
+    for (const q of path) if (q.floor + R * 1.9 < f.H(q.x, q.y) - 20) { pB = q; break; }
+    // o buraco começa um pouco depois do 1º anel: até ali o próprio chão segura o jogador
+    this.holeA = [p0.x + Math.cos(p0.dir) * 45, p0.y + Math.sin(p0.dir) * 45];
+    this.holeB = [pB.x, pB.y];
+    this.holeR = R * 1.08;
+    terrainHole.value.set(this.holeA[0], this.holeA[1], this.holeR);
+    terrainHoleB.value.set(this.holeB[0], this.holeB[1]);
     if (models) this.setModels(models);
     // tocha do jogador (acende dentro)
     this.torch = new THREE.PointLight('#ffb35a', 0, 1400, 1.1);
@@ -237,12 +253,20 @@ export class Cave {
     if (!this.ready) return false;
     const f = this.world.field;
     const H = f.H(x, y);
-    if (Math.hypot(x - this.mouth.x, y - this.mouth.y) < this.size * 0.36 && z < H + 40) return true;
+    if (this.inHole(x, y) && z < H + 40) return true;
     if (z > H - 30) return false;
     const hl = this.hall;
     if (Math.hypot(x - hl.x, y - hl.y) < hl.r * 1.2) return true;
     for (const p of this.path) if (Math.abs(p.x - x) < 180 && Math.abs(p.y - y) < 180) return true;
     return false;
+  }
+
+  inHole(x, y) {
+    const [ax, ay] = this.holeA, [bx, by] = this.holeB;
+    const t0 = ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2 || 1);
+    if (t0 <= 0) return false; // começo reto, igual ao buraco desenhado
+    const t = Math.min(1, t0);
+    return Math.hypot(x - (ax + (bx - ax) * t), y - (ay + (by - ay) * t)) < this.holeR;
   }
 
   // perto (no plano) do túnel, do salão ou da boca

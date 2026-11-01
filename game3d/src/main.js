@@ -96,6 +96,10 @@ if (caveSite) {
   cave.build(caveSite, null);
   world.cave = cave;
   world.clearZones.push({ x: caveSite.x, y: caveSite.y, r: cave.size * 0.8 });
+  // o modelo da boca é vazado dos dois lados: um maciço de pedra tampa o fundo
+  const bx = caveSite.x - caveSite.front[0] * cave.size * 0.5, by = caveSite.y - caveSite.front[1] * cave.size * 0.5;
+  world.fixed.push({ id: 'caverna-fundo', kind: 'cliff', variant: 2, size: 1.5, foot: 140, x: bx, y: by, z: world.field.H(bx, by) - 10, shadow: 0 });
+  world.extras = [...world.fixed];
   // caminho livre do início até a boca
   for (let k = 1; k <= 5; k++) world.clearZones.push({ x: spawn[0] + (caveSite.x - spawn[0]) * (k / 6), y: spawn[1] + (caveSite.y - spawn[1]) * (k / 6), r: 140 });
 }
@@ -358,6 +362,10 @@ function update(dt) {
   gameCam.collide = inCave ? (t, dir, d) => cave.rayFree(t, dir.normalize(), d) : null;
   gameCam.update(dt, player.x, player.y, player.z, inCave ? () => -1e9 : (x, y) => world.groundZ(x, y));
   caveLight = cave.update(dt, player, lightRefs);
+  // dentro da caverna o céu não aparece por nenhuma fresta
+  sky.mesh.visible = caveLight < 0.5;
+  water.mesh.visible = caveLight < 0.5;
+  renderer.setClearColor(caveLight < 0.5 ? SKY.horizon : '#0b0907');
   // árvore entre a câmera e o personagem some (a colisão física continua valendo)
   if (gameCam.mode === 'terceira') {
     const ax = camera.position.x, ay = camera.position.z, bx = player.x, by = player.y;
